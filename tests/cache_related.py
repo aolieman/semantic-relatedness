@@ -51,7 +51,10 @@ def get_category_map(topic_slug_list, language_code, port=8182):
         resp_dict = resp.json()
         if resp.status_code is not 200:
             print resp_dict
-            return {"n_found_cats": 0}
+            # Somehow POSTs can give Rexster the hiccups
+            # and a GET puts it in a working state again
+            requests.get(url, params=payload)
+            return get_category_map(topic_slug_list, language_code)
         resp_dict['n_found_cats'] = len(resp_dict["results"][0])
         return resp_dict
     except Exception as e:
@@ -79,25 +82,33 @@ def get_flow_map(topic_slug_list, language_code, port=8182):
         resp_dict = resp.json()
         if resp.status_code is not 200:
             print resp_dict
-            return {"n_related_topics": 0}
+            # Somehow POSTs can give Rexster the hiccups
+            # and a GET puts it in a working state again
+            requests.get(url, params=payload)
+            return get_flow_map(topic_slug_list, language_code)
         resp_dict['n_related_topics'] = len(resp_dict["results"][0])
         return resp_dict
     except Exception as e:
         print "Server error:", e
         return {"n_related_topics": 0}
         
-def cache_related_resources(dir_path):
+def cache_related_resources(dir_path, start=0):
     ann_file_paths = [os.path.join(dir_path, fn) for fn 
         in os.listdir(dir_path) if fn.endswith("_annotations.json")]
+    for i, fp in enumerate(ann_file_paths):
+        print "{:3d} {}".format(i, fp[len(dir_path):])
         
-    for fp in ann_file_paths:
-        slug_set = set()
+    for fp in ann_file_paths[start:]:
         with open(fp, 'rb') as f:
             annotations = json.load(f)
+        print fp
         for ann in annotations:
-            for cand in ann[u'resource']:
-                slug_set.add(unicode(cand[u'uri']))
-        cat_map = get_category_map(list(slug_set), 'en')
-        print "N found cats:", cat_map['n_found_cats'], "\n"
-        flow_map = get_flow_map(list(slug_set), 'en')
-        print "N related resources:", flow_map['n_related_topics'], "\n"
+            try:
+                for cand in ann[u'resource']:
+                    slug = unicode(cand[u'uri'])
+                    cat_map = get_category_map([slug], 'en')
+                    print "N found cats:", cat_map['n_found_cats'], "\n"
+                    flow_map = get_flow_map(list([slug]), 'en')
+                    print "N related resources:", flow_map['n_related_topics'], "\n"
+            except KeyError:
+                pass
