@@ -9,7 +9,7 @@ def combine( Map... m ) {
   }
 }
 
-def getCatFlowMap( topic_list, lang_code ){
+def getCatFlowMap( topic_list, lang_code, max_topics=0 ){
     total_flow = [:]
 
     for (topic_slug in topic_list) {
@@ -17,21 +17,24 @@ def getCatFlowMap( topic_list, lang_code ){
         flow = [:]
         if (lang_code == "nl") {
             v = g.v("http://nl.dbpedia.org/resource/$topic_slug")
+            nsp_len = "http://nl.dbpedia.org/resource/".size()
         } else {
             v = g.v("http://dbpedia.org/resource/$topic_slug")
+            nsp_len = "http://dbpedia.org/resource/".size()
         }
 
         // Count flow (Sibling, Narrower, Broader, and Cousin topics)
 
         v.out('dcterms:subject').dedup().filter{!ign.contains(it.id)}.as('mothers')
-         .in('dcterms:subject').groupCount(flow){it.id}{it.b+1.0}  // Sibling w1.0
+         .in('dcterms:subject').groupCount(flow){it.id.substring(nsp_len)}{it.b+1.0}  // Sibling w1.0
          .back('mothers')
          .both('skos:broader').filter{!ign.contains(it.id)}.in('dcterms:subject')
-         .groupCount(flow){it.id}{it.b+0.5}.iterate()                      // Narrower & Broader w0.5
+         .groupCount(flow){it.id.substring(nsp_len)}{it.b+0.5}.iterate()              // Narrower & Broader w0.5
 
          // Normalize flow (as fraction)
          flow.remove(v.id)
-         flow.each{ it -> flow[it.key] = it.value / flow.values().sum() }
+         flow_sum = flow.values().sum()
+         flow.each{ it -> flow[it.key] = it.value / flow_sum }
 
          // Update total_flow to reflect average flow
          if (topic_list.size() > 1) {
@@ -42,9 +45,12 @@ def getCatFlowMap( topic_list, lang_code ){
     }
 
     // Sort by flow count
-    max_topics = 50
-    if (total_flow.size() < max_topics){max_topics = total_flow.size()}
-    flow_sorted = total_flow.sort{ a,b -> b.value <=> a.value }[0..max_topics-1]
+    flow_sorted = total_flow.sort{ a,b -> b.value <=> a.value }
+
+    if (max_topics > 0) {
+        if (total_flow.size() < max_topics){max_topics = total_flow.size()}
+        flow_sorted = flow_sorted[0..max_topics-1]
+    }
 
     return flow_sorted
 }
