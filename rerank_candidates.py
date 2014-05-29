@@ -8,15 +8,15 @@ def oper_vals_to_avg(oper, divisor, avg_dict, *dicts):
     returns a defaultdict(float).
     Assumes values can be added to 0.0; raises when needed.
     """
-    sum_dict = defaultdict(float)
+    avg_dict = avg_dict.copy()
     for dict in dicts:
         for k, v in dict.iteritems():
-            oper(sum_dict[k], v / divisor)
-    return sum_dict
+            avg_dict[k] = oper(avg_dict[k], v / divisor)
+    return avg_dict
 
 def rerank_unweighted(annotations):
     # Get per-annotation and average flow
-    avg_flow_map = {}
+    avg_flow_map = defaultdict(float)
     n_ann = len(annotations)
     for ann in annotations:
         slug_set = set()
