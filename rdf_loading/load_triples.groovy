@@ -2,9 +2,34 @@ import org.openrdf.rio.*
 import org.openrdf.rio.ntriples.*
 import org.openrdf.rio.helpers.*
 import org.openrdf.model.*
+import org.apache.commons.compress.compressors.*
+
+// Titan configuration & schema definitions
+def prepareTitan(String storage_directory) {
+    def conf = new BaseConfiguration()
+    conf.setProperty("storage.backend", "cassandra")
+    conf.setProperty("storage.directory", storage_directory)
+    conf.setProperty("storage.batch-loading", true)
+    conf.setProperty("storage.infer-schema", false)
+      
+    def g = TitanFactory.open(conf)
+    g.makeKey("qname").dataType(String).single().unique().indexed(Vertex).make()
+    createdAt = g.makeKey("created_at").dataType(Date).make()
+    provenance = g.makeKey("provenance").dataType(String).make()
+    rdfsLabel = g.makeKey("rdfs:label").dataType(String).make()
+    // TODO: add definitions for all predicates with literal objects
+    g.makeLabel("rdf:type").signature(createdAt, provenance).make()
+    // TODO: add definitions for all edge types
+    g.commit()
+
+    bg = new BatchGraph(g, VertexIDType.STRING, 10000)
+    bg.setVertexIdKey("qname")
+    return bg
+}
 
 // Creates vertices and edges from RDF statements
 class StatementsToGraphDB extends RDFHandlerBase {
+    def tripleCount = 0L
 
     // Define known namespaces with their prefix
     def namespaces = [
@@ -36,7 +61,12 @@ class StatementsToGraphDB extends RDFHandlerBase {
             object = st.object.getLabel()
         }
         println([subject, predicate, object])
+
         countedStatements[qName(st.predicate)] += 1
+        if (++tripleCount%100000L == 0L) {
+            println( (new Date()).toString() + \
+            " Processed ${tripleCount} triples")
+        }
     }
     
     def getCountedStatements() {
@@ -67,14 +97,18 @@ class StatementsToGraphDB extends RDFHandlerBase {
 
 
 def loadRdfFromFile(String filepath) {
-    documentUrl = new URL(filepath)
-    def inputStream = documentUrl.openStream()
+    // Initialize a stream that feeds bz2-compressed triples
+    def fin = new FileInputStream(filepath)
+    def bis = new BufferedInputStream(fin)
+    def cis = new CompressorStreamFactory()
+                .createCompressorInputStream(CompressorStreamFactory.BZIP2, bis)
+
     def graphCommitter = new StatementsToGraphDB()
     def rdfParser = new NTriplesParser()
     rdfParser.setRDFHandler(graphCommitter)
 
     try {
-        rdfParser.parse(inputStream, documentUrl.toString())
+        rdfParser.parse(cis, "http://dbpedia.org/resource/")
     } catch (IOException e) {
         // handle IO problems (e.g. the file could not be read)
         println(e)
