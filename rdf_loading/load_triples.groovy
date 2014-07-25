@@ -14,6 +14,7 @@ def prepareTitan(String storage_directory) {
       
     def g = TitanFactory.open(conf)
     g.makeKey("qname").dataType(String).single().unique().indexed(Vertex).make()
+    _partition = g.makeKey("_partition").dataType(String).single().indexed(Vertex).make()
     createdAt = g.makeKey("created_at").dataType(Date).make()
     provenance = g.makeKey("provenance").dataType(String).make()
     rdfsLabel = g.makeKey("rdfs:label").dataType(String).make()
