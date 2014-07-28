@@ -61,7 +61,6 @@ class StatementsToGraphDB extends RDFHandlerBase {
             // TODO: handle literal datatypes
             object = st.object.getLabel()
         }
-        println([subject, predicate, object])
 
         countedStatements[qName(st.predicate)] += 1
         if (++tripleCount%100000L == 0L) {
