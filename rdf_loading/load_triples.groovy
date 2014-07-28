@@ -101,8 +101,9 @@ def loadRdfFromFile(String filepath) {
     // Initialize a stream that feeds bz2-compressed triples
     def fin = new FileInputStream(filepath)
     def bis = new BufferedInputStream(fin)
-    def cis = new CompressorStreamFactory()
-                .createCompressorInputStream(CompressorStreamFactory.BZIP2, bis)
+    def cisFactory = new CompressorStreamFactory()
+    cisFactory.setDecompressConcatenated(true)
+    def cis = cisFactory.createCompressorInputStream(CompressorStreamFactory.BZIP2, bis)
 
     def graphCommitter = new StatementsToGraphDB()
     def rdfParser = new NTriplesParser()
