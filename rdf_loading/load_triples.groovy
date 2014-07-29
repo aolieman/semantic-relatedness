@@ -5,25 +5,35 @@ import org.openrdf.model.*
 import org.apache.commons.compress.compressors.*
 
 // Titan configuration & schema definitions
-def prepareTitan(String storage_directory) {
+def prepareTitan(String storageDirectory, ArrayList langCodes) {
     def conf = new BaseConfiguration()
     conf.setProperty("storage.backend", "cassandra")
-    conf.setProperty("storage.directory", storage_directory)
+    conf.setProperty("storage.directory", storageDirectory)
     conf.setProperty("storage.batch-loading", true)
     conf.setProperty("storage.infer-schema", false)
       
     def g = TitanFactory.open(conf)
     g.makeKey("qname").dataType(String).single().unique().indexed(Vertex).make()
-    _partition = g.makeKey("_partition").dataType(String).single().indexed(Vertex).make()
+    _partition = g.makeKey("_partition").dataType(String).single().indexed(Vertex).indexed(Edge).make()
     createdAt = g.makeKey("created_at").dataType(Date).make()
     provenance = g.makeKey("provenance").dataType(String).make()
-    rdfsLabel = g.makeKey("rdfs:label").dataType(String).make()
+    langCodes.each {
+        g.makeKey("rdfs:label@" + it).dataType(String).make()
+        g.makeKey("rdfs:comment@" + it).dataType(String).make()
+    }
+    g.makeKey("rdfs:label").dataType(String).make()
+    
     // TODO: add definitions for all predicates with literal objects
-    g.makeLabel("rdf:type").signature(createdAt, provenance).make()
+    [
+        "rdf:type", "dcterms:subject"
+    ].each {
+        g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
+    }
     // TODO: add definitions for all edge types
     g.commit()
 
-    bg = new BatchGraph(g, VertexIDType.STRING, 10000)
+    pg = new PartitionGraph(g, '_partition', 'dbp')
+    bg = new BatchGraph(pg, VertexIDType.STRING, 10000)
     bg.setVertexIdKey("qname")
     return bg
 }
@@ -31,11 +41,24 @@ def prepareTitan(String storage_directory) {
 // Creates vertices and edges from RDF statements
 class StatementsToGraphDB extends RDFHandlerBase {
     def tripleCount = 0L
+    // Human formatting for large numbers
+    def oom = ['k', 'M', 'G', 'T'] as char[]
+    def humanFormat(double n, iteration=0) {
+        double d = ((long) n / 100) / 10.0;
+        boolean isRound = (d * 10) %10 == 0;
+        return (d < 1000?
+            ((d > 99.9 || isRound || (!isRound && d > 9.99)?
+             (int) d * 10 / 10 : d + ""
+             ) + "" + oom[iteration]) 
+            : humanFormat(d, iteration+1));
+
+    }
 
     // Define known namespaces with their prefix
     def namespaces = [
         'http://dbpedia.org/resource/': 'dbp',
         'http://dbpedia.org/ontology/': 'dbp-owl',
+        'http://dbpedia.org/property/': 'dbpprop',
         'http://www.w3.org/1999/02/22-rdf-syntax-ns#': 'rdf',
         'http://www.w3.org/2000/01/rdf-schema#': 'rdfs',
         'http://www.w3.org/2002/07/owl#': 'owl',
@@ -44,7 +67,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
         'http://rdf.freebase.com/ns/': 'freebase',
         'http://www.wikidata.org/entity/': 'wikidata',
         'http://purl.org/dc/terms/': 'dcterms',
-        'http://www.w3.org/2004/02/skos/core#': 'skos'
+        'http://www.w3.org/2004/02/skos/core#': 'skos',
+        'http://purl.org/ontology/bibo/': 'bibo'
     ]
 
     def unknownNamespaces = new HashSet()
@@ -65,16 +89,19 @@ class StatementsToGraphDB extends RDFHandlerBase {
         countedStatements[qName(st.predicate)] += 1
         if (++tripleCount%100000L == 0L) {
             println( (new Date()).toString() + \
-            " Processed ${tripleCount} triples")
+            " Processed ${humanFormat(tripleCount)} triples")
         }
     }
     
     def getCountedStatements() {
-        return countedStatements
+        return countedStatements.sort { a, b -> b.value <=> a.value }
     }
 
     def qName(URI uri) {
         def nspc = uri.getNamespace()
+        if (nspc.split("/resource/").size() > 1) {
+            nspc = nspc[0..(-nspc.split("/resource/")[-1].size()-1)]
+        }
         def prefix = namespaces[nspc]
         if (prefix == null) {
             // resolve i18n DBpedia resources
@@ -120,6 +147,9 @@ def loadRdfFromFile(String filepath) {
         // handle a problem encountered by the RDFHandler
         println(e)
     }
+    
+    println(graphCommitter.getCountedStatements())
+    println("Unknown namespaces: " + graphCommitter.unknownNamespaces)
 
     return graphCommitter
 }
