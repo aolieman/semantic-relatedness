@@ -20,12 +20,14 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
     langCodes.each {
         g.makeKey("rdfs:label@" + it).dataType(String).make()
         g.makeKey("rdfs:comment@" + it).dataType(String).make()
+        g.makeKey("skos:prefLabel@" + it).dataType(String).make()
     }
     g.makeKey("rdfs:label").dataType(String).make()
     
     // TODO: add definitions for all predicates with literal objects
     [
-        "rdf:type", "dcterms:subject"
+        "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
+        "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related"
     ].each {
         g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
     }
@@ -68,7 +70,9 @@ class StatementsToGraphDB extends RDFHandlerBase {
         'http://www.wikidata.org/entity/': 'wikidata',
         'http://purl.org/dc/terms/': 'dcterms',
         'http://www.w3.org/2004/02/skos/core#': 'skos',
-        'http://purl.org/ontology/bibo/': 'bibo'
+        'http://purl.org/ontology/bibo/': 'bibo',
+        'http://www.opengis.net/gml/': 'gml',
+        'http://www.w3.org/2004/02/skos/core#': 'skos'
     ]
 
     def unknownNamespaces = new HashSet()
@@ -78,9 +82,16 @@ class StatementsToGraphDB extends RDFHandlerBase {
     void handleStatement(Statement st) {
         def subject = qName(st.subject)
         def predicate = qName(st.predicate)
-        def object
+        def object, vObj, edge
+
+        def vSubj = bg.getVertex(subject) ?: bg.addVertex(subject)
+
         if (st.object instanceof URI) {
             object = qName(st.object)
+            vObj = bg.getVertex(object) ?: bg.addVertex(object)
+            edge = bg.addEdge(null, vSubj, vObj, predicate)
+            edge.setProperty("created_at", new Date)
+            edge.setProperty("provenance", filename)
         } else {
             // TODO: handle literal datatypes
             object = st.object.getLabel()
