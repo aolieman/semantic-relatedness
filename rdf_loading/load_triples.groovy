@@ -27,21 +27,24 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
     // TODO: add definitions for all predicates with literal objects
     [
         "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
-        "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related"
+        "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related",
     ].each {
         g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
     }
     // TODO: add definitions for all edge types
     g.commit()
 
-    pg = new PartitionGraph(g, '_partition', 'dbp')
-    bg = new BatchGraph(pg, VertexIDType.STRING, 10000)
+    bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
     bg.setVertexIdKey("qname")
-    return bg
+    pg = new PartitionGraph(bg, '_partition', 'dbp')
+    return pg
 }
 
 // Creates vertices and edges from RDF statements
 class StatementsToGraphDB extends RDFHandlerBase {
+    def bg, sourceFilename
+    StatementsToGraphDB(g, sFn) { bg = g; sourceFilename = sFn }
+
     def tripleCount = 0L
     // Human formatting for large numbers
     def oom = ['k', 'M', 'G', 'T'] as char[]
@@ -82,7 +85,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
     void handleStatement(Statement st) {
         def subject = qName(st.subject)
         def predicate = qName(st.predicate)
-        def object, vObj, edge
+        def object, vObj, edge, langCode, propKey
 
         def vSubj = bg.getVertex(subject) ?: bg.addVertex(subject)
 
@@ -90,11 +93,16 @@ class StatementsToGraphDB extends RDFHandlerBase {
             object = qName(st.object)
             vObj = bg.getVertex(object) ?: bg.addVertex(object)
             edge = bg.addEdge(null, vSubj, vObj, predicate)
-            edge.setProperty("created_at", new Date)
-            edge.setProperty("provenance", filename)
+            edge.setProperty("created_at", new Date())
+            edge.setProperty("provenance", sourceFilename)
         } else {
             // TODO: handle literal datatypes
             object = st.object.getLabel()
+            langCode = st.object.getLanguage()
+            propKey = predicate + '@' + langCode
+            vSubj.setProperty(propKey, object)
+            vSubj.setProperty("created_at", new Date())
+            vSubj.setProperty("provenance", sourceFilename)
         }
 
         countedStatements[qName(st.predicate)] += 1
@@ -134,7 +142,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
 }
 
 
-def loadRdfFromFile(String filepath) {
+def loadRdfFromFile(Graph graph, String filepath) {
     // Initialize a stream that feeds bz2-compressed triples
     def fin = new FileInputStream(filepath)
     def bis = new BufferedInputStream(fin)
@@ -142,7 +150,8 @@ def loadRdfFromFile(String filepath) {
     cisFactory.setDecompressConcatenated(true)
     def cis = cisFactory.createCompressorInputStream(CompressorStreamFactory.BZIP2, bis)
 
-    def graphCommitter = new StatementsToGraphDB()
+    def sourceFilename = filepath.split('/')[-1][0..-5]
+    def graphCommitter = new StatementsToGraphDB(graph, sourceFilename)
     def rdfParser = new NTriplesParser()
     rdfParser.setRDFHandler(graphCommitter)
 
@@ -159,6 +168,8 @@ def loadRdfFromFile(String filepath) {
         println(e)
     }
     
+    graph.commit()
+
     println(graphCommitter.getCountedStatements())
     println("Unknown namespaces: " + graphCommitter.unknownNamespaces)
 
