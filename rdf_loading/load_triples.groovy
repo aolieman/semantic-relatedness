@@ -168,7 +168,7 @@ def loadRdfFromFile(Graph graph, String filepath) {
         println(e)
     }
     
-    graph.commit()
+    graph.baseGraph.commit()
 
     println(graphCommitter.getCountedStatements())
     println("Unknown namespaces: " + graphCommitter.unknownNamespaces)
