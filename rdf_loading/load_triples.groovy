@@ -154,6 +154,7 @@ def loadRdfFromFile(Graph graph, String filepath) {
     def graphCommitter = new StatementsToGraphDB(graph, sourceFilename)
     def rdfParser = new NTriplesParser()
     rdfParser.setRDFHandler(graphCommitter)
+    def startTime = System.currentTimeMillis()
 
     try {
         rdfParser.parse(cis, "http://dbpedia.org/resource/")
@@ -170,9 +171,20 @@ def loadRdfFromFile(Graph graph, String filepath) {
     
     graph.baseGraph.commit()
 
+    def endTime = System.currentTimeMillis()
+    printTimeDifference(startTime, endTime)
+
     println(graphCommitter.getCountedStatements())
     println("Unknown namespaces: " + graphCommitter.unknownNamespaces)
 
     return graphCommitter
 }
 
+def printTimeDifference(long epoch1, long epoch2){
+    long runningTime = epoch2 - epoch1
+    long diffMinutes = diff / (60 * 1000) % 60
+    long diffHours = diff / (60 * 60 * 1000) % 24
+    long diffDays = diff / (24 * 60 * 60 * 1000)
+
+    println("\nLoading took ${diffDays} days, ${diffHours} hours, ${diffMinutes} minutes.\n")
+}
