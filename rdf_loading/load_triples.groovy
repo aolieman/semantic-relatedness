@@ -182,9 +182,9 @@ def loadRdfFromFile(Graph graph, String filepath) {
 
 def printTimeDifference(long epoch1, long epoch2){
     long runningTime = epoch2 - epoch1
-    long diffMinutes = diff / (60 * 1000) % 60
-    long diffHours = diff / (60 * 60 * 1000) % 24
-    long diffDays = diff / (24 * 60 * 60 * 1000)
+    long diffMinutes = runningTime / (60 * 1000) % 60
+    long diffHours = runningTime / (60 * 60 * 1000) % 24
+    long diffDays = runningTime / (24 * 60 * 60 * 1000)
 
     println("\nLoading took ${diffDays} days, ${diffHours} hours, ${diffMinutes} minutes.\n")
 }
