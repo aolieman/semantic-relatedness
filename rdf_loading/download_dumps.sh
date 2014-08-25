@@ -7,7 +7,7 @@ echo "Downloading dumps for DBpedia v$DBP_VERSION. Edit the script source to cha
 
 if [ -n "$1" ] && [ -n "$2" ]; then
   target_dir="$1/v$DBP_VERSION"
-  lc=$2
+  lc="$2"
 else  
   echo $USGSTR
   exit 1
