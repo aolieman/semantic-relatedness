@@ -27,6 +27,7 @@ do
         url="http://downloads.dbpedia.org/3.9/$lc/$fn"
         echo "Downloading $url..."
         wget -P "$target_dir/$lc/" "$url"
+    fi
 done
 
 echo "All done!"
