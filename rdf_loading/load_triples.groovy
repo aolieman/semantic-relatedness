@@ -1,3 +1,9 @@
+/**
+ * Script for bulk loading RDF (e.g. DBpedia) into Titan
+ *
+ * Known issues:
+ * - assign >= mx 1024mb to the Gremlin shell JVM
+ */
 import org.openrdf.rio.*
 import org.openrdf.rio.ntriples.*
 import org.openrdf.rio.helpers.*
@@ -11,6 +17,10 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
     conf.setProperty("storage.directory", storageDirectory)
     conf.setProperty("storage.batch-loading", true)
     conf.setProperty("storage.infer-schema", false)
+    conf.setProperty("storage.index.search.backend", "elasticsearch")
+    conf.setProperty("storage.index.search.directory", storageDirectory + "/searchindex")
+    conf.setProperty("storage.index.search.client-only", false)
+    conf.setProperty("storage.index.search.local-mode", true)
       
     def g = TitanFactory.open(conf)
     g.makeKey("qname").dataType(String).single().unique().indexed(Vertex).make()
@@ -21,13 +31,16 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         g.makeKey("rdfs:label@" + it).dataType(String).make()
         g.makeKey("rdfs:comment@" + it).dataType(String).make()
         g.makeKey("skos:prefLabel@" + it).dataType(String).make()
+        g.makeKey("georss:point@" + it).dataType(String).make()
     }
     g.makeKey("rdfs:label").dataType(String).make()
-    
+    g.makeKey("geo:lat").dataType(Float).indexed("search", Vertex).make()
+    g.makeKey("geo:long").dataType(Float).indexed("search", Vertex).make()
     // TODO: add definitions for all predicates with literal objects
     [
         "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
         "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related",
+        "owl:sameAs", "dbp-owl:wikiPageRedirects",
     ].each {
         g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
     }
@@ -36,7 +49,8 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
 
     bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
     bg.setVertexIdKey("qname")
-    // For incremental loading, may need: bg.setLoadingFromScratch(false)
+    // For intermittent loading, may need: bg.setLoadingFromScratch(false)
+    bg.setLoadingFromScratch(false)
     pg = new PartitionGraph(bg, '_partition', 'dbp')
     return pg
 }
@@ -76,6 +90,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
         'http://www.w3.org/2004/02/skos/core#': 'skos',
         'http://purl.org/ontology/bibo/': 'bibo',
         'http://www.opengis.net/gml/': 'gml',
+        'http://www.w3.org/2003/01/geo/wgs84_pos#': 'geo',
+        'http://www.georss.org/georss/': 'georss',
         'http://www.w3.org/2004/02/skos/core#': 'skos'
     ]
 
@@ -97,10 +113,16 @@ class StatementsToGraphDB extends RDFHandlerBase {
             edge.setProperty("created_at", new Date())
             edge.setProperty("provenance", sourceFilename)
         } else {
-            // TODO: handle literal datatypes
-            object = st.object.getLabel()
-            langCode = st.object.getLanguage()
-            propKey = predicate + '@' + langCode
+            // TODO: handle additional literal datatypes
+            def datatype = st.object.getDatatype()
+            if (datatype && datatype.getLocalName() == "float") {
+                object = st.object.floatValue()
+                propKey = predicate
+            } else {
+                object = st.object.getLabel()
+                langCode = st.object.getLanguage()
+                propKey = predicate + '@' + langCode
+            }
             vSubj.setProperty(propKey, object)
             vSubj.setProperty("created_at", new Date())
             vSubj.setProperty("provenance", sourceFilename)
