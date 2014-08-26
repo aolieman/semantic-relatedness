@@ -36,6 +36,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
 
     bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
     bg.setVertexIdKey("qname")
+    // For incremental loading, may need: bg.setLoadingFromScratch(false)
     pg = new PartitionGraph(bg, '_partition', 'dbp')
     return pg
 }
@@ -142,6 +143,18 @@ class StatementsToGraphDB extends RDFHandlerBase {
 }
 
 
+class Helpers {
+    def printLoadingTime(long epoch1, long epoch2, String filename){
+        long runningTime = epoch2 - epoch1
+        long diffMinutes = Math.round(runningTime / (60 * 1000)) % 60
+        long diffHours = Math.round(runningTime / (60 * 60 * 1000)) % 24
+        long diffDays = Math.round(runningTime / (24 * 60 * 60 * 1000))
+
+        println("\nLoading ${filename} took ${diffDays} days, ${diffHours} hours, ${diffMinutes} minutes.\n")
+    }
+}
+
+
 def loadRdfFromFile(Graph graph, String filepath) {
     // Initialize a stream that feeds bz2-compressed triples
     def fin = new FileInputStream(filepath)
@@ -172,19 +185,11 @@ def loadRdfFromFile(Graph graph, String filepath) {
     graph.baseGraph.commit()
 
     def endTime = System.currentTimeMillis()
-    printTimeDifference(startTime, endTime)
+    def helpers = new Helpers()
+    helpers.printLoadingTime(startTime, endTime, sourceFilename)
 
     println(graphCommitter.getCountedStatements())
     println("Unknown namespaces: " + graphCommitter.unknownNamespaces)
 
     return graphCommitter
-}
-
-def printTimeDifference(long epoch1, long epoch2){
-    long runningTime = epoch2 - epoch1
-    long diffMinutes = runningTime / (60 * 1000) % 60
-    long diffHours = runningTime / (60 * 60 * 1000) % 24
-    long diffDays = runningTime / (24 * 60 * 60 * 1000)
-
-    println("\nLoading took ${diffDays} days, ${diffHours} hours, ${diffMinutes} minutes.\n")
 }
