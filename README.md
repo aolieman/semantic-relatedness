@@ -12,7 +12,7 @@ Work on this module has been supported by:
 Usage
 -----
 
-```groovy
+```bash
 $ /path/to/semantic-relatedness/rdf_loading/download_dumps.sh /path/to/dbpedia_dumps en
     Downloading English DBpedia dumps
 $ /path/to/semantic-relatedness/rdf_loading/download_dumps.sh /path/to/dbpedia_dumps nl
