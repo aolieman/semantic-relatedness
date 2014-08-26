@@ -9,6 +9,25 @@ Work on this module has been supported by:
 - [University of Amsterdam](http://www.illc.uva.nl/)
 - [Stamkracht BV](http://www.stamkracht.com/)
 
+Usage
+-----
+
+```groovy
+$ /path/to/semantic-relatedness/rdf_loading/download_dumps.sh /path/to/dbpedia_dumps en
+    Downloading English DBpedia dumps
+$ /path/to/semantic-relatedness/rdf_loading/download_dumps.sh /path/to/dbpedia_dumps nl
+    Downloading Dutch DBpedia dumps
+    
+$ ./titan/bin/gremlin.sh /path/to/semantic-relatedness/rdf_loading/load_triples.groovy
+
+         \,,,/
+         (o o)
+-----oOOo-(_)-oOOo-----
+
+gremlin> bg = prepareTitan("/path/to/storage_directory", ['en', 'nl'])
+gremlin> handler = loadRdfFromFile(bg, "/path/to/dbpedia_dumps/v3.9/en/skos_categories_en.nt.bz2")
+```
+
 License
 -------
 
