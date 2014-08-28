@@ -3,6 +3,7 @@
  *
  * Known issues:
  * - assign >= mx 1024mb to the Gremlin shell JVM
+ * - Cassandra resource limits: http://www.datastax.com/documentation/cassandra/2.0/cassandra/troubleshooting/trblshootInsufficientResources_r.html
  */
 import org.openrdf.rio.*
 import org.openrdf.rio.ntriples.*
@@ -71,7 +72,6 @@ class StatementsToGraphDB extends RDFHandlerBase {
              (int) d * 10 / 10 : d + ""
              ) + "" + oom[iteration]) 
             : humanFormat(d, iteration+1));
-
     }
 
     // Define known namespaces with their prefix
@@ -114,6 +114,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
             edge.setProperty("provenance", sourceFilename)
         } else {
             // TODO: handle additional literal datatypes
+            // http://openrdf.callimachus.net/sesame/2.7/apidocs/org/openrdf/model/impl/LiteralImpl.html
             def datatype = st.object.getDatatype()
             if (datatype && datatype.getLocalName() == "float") {
                 object = st.object.floatValue()

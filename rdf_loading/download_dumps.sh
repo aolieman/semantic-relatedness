@@ -13,10 +13,10 @@ else
   exit 1
 fi
 
-FNAMES=( "article_categories_$lc.nt.bz2" "category_labels_$ls.nt.bz2" "disambiguations_$ls.nt.bz2" 
-         "geo_coordinates_$ls.nt.bz2" "instance_types_$ls.nt.bz2" "instance_types_heuristic_$ls.nt.bz2" 
-         "interlanguage_links_$ls.nt.bz2" "labels_$ls.nt.bz2" "page_links_$ls.nt.bz2" "redirects_$ls.nt.bz2" 
-         "short_abstracts_$ls.nt.bz2" "skos_categories_$ls.nt.bz2" )
+FNAMES=( "article_categories_$lc.nt.bz2" "category_labels_$lc.nt.bz2" "disambiguations_$lc.nt.bz2" 
+         "geo_coordinates_$lc.nt.bz2" "instance_types_$lc.nt.bz2" "instance_types_heuristic_$lc.nt.bz2" 
+         "interlanguage_links_$lc.nt.bz2" "labels_$lc.nt.bz2" "page_links_$lc.nt.bz2" "redirects_$lc.nt.bz2" 
+         "short_abstracts_$lc.nt.bz2" "skos_categories_$lc.nt.bz2" )
          
 for fn in "${FNAMES[@]}"
 do
