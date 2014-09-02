@@ -15,7 +15,7 @@ import org.apache.commons.compress.compressors.*
 def prepareTitan(String storageDirectory, ArrayList langCodes) {
     def conf = new BaseConfiguration()
     conf.setProperty("storage.backend", "cassandra")
-    conf.setProperty("storage.directory", storageDirectory)
+    conf.setProperty("storage.hostname", "127.0.0.1")
     conf.setProperty("storage.batch-loading", true)
     conf.setProperty("storage.infer-schema", false)
     conf.setProperty("storage.index.search.backend", "elasticsearch")
