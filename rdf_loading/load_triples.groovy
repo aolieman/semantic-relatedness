@@ -14,6 +14,7 @@ import org.apache.commons.compress.compressors.*
 // Titan configuration & schema definitions
 def prepareTitan(String storageDirectory, ArrayList langCodes) {
     def conf = new BaseConfiguration()
+    conf.setProperty("ids.block-size", 100000)
     conf.setProperty("storage.backend", "cassandra")
     conf.setProperty("storage.hostname", "127.0.0.1")
     conf.setProperty("storage.batch-loading", true)
@@ -53,8 +54,10 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
     }
     bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
     bg.setVertexIdKey("qname")
-    // For intermittent loading, may need: bg.setLoadingFromScratch(false)
-    bg.setLoadingFromScratch(false)
+    // Assumption: if "qname" exists, we are not loading from scratch.
+    if (g.getType("qname") != null) {
+        bg.setLoadingFromScratch(false)
+    }
     pg = new PartitionGraph(bg, '_partition', 'dbp')
     return pg
 }
