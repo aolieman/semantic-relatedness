@@ -1,7 +1,17 @@
+// Vertex getter by qName
+def vqName(qname) {
+    res = g.getVertices("qname", qname)
+    if (res.size() == 0) {return null}
+    else if (res.size() == 1) {return res.take(1)[0]}
+    else {
+        throw new IllegalArgumentException("$qname is associated with multiple vertices!")
+    }
+}
+
 // Define categories to ignore (e.g. supernodes)
-def ign = [g.uri('dbp-nl:Categorie:Alles'), g.uri('dbp-nl:Categorie:Lijsten'),
-           g.uri('dbp-nl:Categorie:Wikipedia'), g.uri('dbp:Category:Container_categories'),
-           g.uri('dbp:Category:Fundamental_categories'), g.uri('dbp:Category:Main_topic_classifications')]
+def ign = [vqName('dbp-nl:Categorie:Alles').id, vqName('dbp-nl:Categorie:Lijsten').id,
+           vqName('dbp-nl:Categorie:Wikipedia').id, vqName('dbp:Category:Container_categories').id,
+           vqName('dbp:Category:Fundamental_categories').id, vqName('dbp:Category:Main_topic_classifications').id]
 
 def combine( Map... m ) {
   m.collectMany { it.entrySet() }.inject( [:] ) { result, e ->
@@ -16,23 +26,21 @@ def getCatFlowMap( topic_list, lang_code, max_topics=0 ){
         // Process one topic URI
         flow = [:]
         if (lang_code == "nl") {
-            v = g.v("http://nl.dbpedia.org/resource/$topic_slug")
-            nsp_len = "http://nl.dbpedia.org/resource/".size()
+            v = vqName("dbp-nl:$topic_slug")
         } else {
-            v = g.v("http://dbpedia.org/resource/$topic_slug")
-            nsp_len = "http://dbpedia.org/resource/".size()
+            v = vqName("dbp:$topic_slug")
         }
 
         // Count flow (Sibling, Narrower, Broader, and Cousin topics)
 
         v.out('dcterms:subject').dedup().filter{!ign.contains(it.id)}.as('mothers')
-         .in('dcterms:subject').groupCount(flow){it.id.substring(nsp_len)}{it.b+1.0}  // Sibling w1.0
+         .in('dcterms:subject').groupCount(flow){it.qname}{it.b+1.0}  // Sibling w1.0
          .back('mothers')
          .both('skos:broader').filter{!ign.contains(it.id)}.in('dcterms:subject')
-         .groupCount(flow){it.id.substring(nsp_len)}{it.b+0.5}.iterate()              // Narrower & Broader w0.5
+         .groupCount(flow){it.qname}{it.b+0.5}.iterate()              // Narrower & Broader w0.5
 
          // Normalize flow (as fraction)
-         flow.remove(v.id)
+         flow.remove(v.qname)
          flow_sum = flow.values().sum()
          flow.each{ it -> flow[it.key] = it.value / flow_sum }
 
