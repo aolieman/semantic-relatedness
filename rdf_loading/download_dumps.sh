@@ -14,9 +14,12 @@ else
 fi
 
 FNAMES=( "article_categories_$lc.nt.bz2" "category_labels_$lc.nt.bz2" "disambiguations_$lc.nt.bz2" 
-         "geo_coordinates_$lc.nt.bz2" "instance_types_$lc.nt.bz2" "instance_types_heuristic_$lc.nt.bz2" 
+         "geo_coordinates_$lc.nt.bz2" "instance_types_$lc.nt.bz2" 
          "interlanguage_links_$lc.nt.bz2" "labels_$lc.nt.bz2" "page_links_$lc.nt.bz2" "redirects_$lc.nt.bz2" 
          "short_abstracts_$lc.nt.bz2" "skos_categories_$lc.nt.bz2" )
+if [ $lc -eq "en" ]; then
+    FNAMES+=( "instance_types_heuristic_$lc.nt.bz2" )
+fi
          
 for fn in "${FNAMES[@]}"
 do

@@ -14,8 +14,9 @@ import org.apache.commons.compress.compressors.*
 // Titan configuration & schema definitions
 def prepareTitan(String storageDirectory, ArrayList langCodes) {
     def conf = new BaseConfiguration()
+    conf.setProperty("ids.block-size", 100000)
     conf.setProperty("storage.backend", "cassandra")
-    conf.setProperty("storage.directory", storageDirectory)
+    conf.setProperty("storage.hostname", "127.0.0.1")
     conf.setProperty("storage.batch-loading", true)
     conf.setProperty("storage.infer-schema", false)
     conf.setProperty("storage.index.search.backend", "elasticsearch")
@@ -24,34 +25,39 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
     conf.setProperty("storage.index.search.local-mode", true)
       
     def g = TitanFactory.open(conf)
-    g.makeKey("qname").dataType(String).single().unique().indexed(Vertex).make()
-    _partition = g.makeKey("_partition").dataType(String).single().indexed(Vertex).indexed(Edge).make()
-    createdAt = g.makeKey("created_at").dataType(Date).make()
-    provenance = g.makeKey("provenance").dataType(String).make()
-    langCodes.each {
-        g.makeKey("rdfs:label@" + it).dataType(String).make()
-        g.makeKey("rdfs:comment@" + it).dataType(String).make()
-        g.makeKey("skos:prefLabel@" + it).dataType(String).make()
-        g.makeKey("georss:point@" + it).dataType(String).make()
+    // Types should only be defined once
+    // Assumption: if "qname" exists, all keys and labels exist.
+    if (g.getType("qname") == null) {
+        g.makeKey("qname").dataType(String).single().unique().indexed(Vertex).make()
+        _partition = g.makeKey("_partition").dataType(String).single().indexed(Vertex).indexed(Edge).make()
+        createdAt = g.makeKey("created_at").dataType(Date).make()
+        provenance = g.makeKey("provenance").dataType(String).make()
+        langCodes.each {
+            g.makeKey("rdfs:label@" + it).dataType(String).make()
+            g.makeKey("rdfs:comment@" + it).dataType(String).make()
+            g.makeKey("skos:prefLabel@" + it).dataType(String).make()
+            g.makeKey("georss:point@" + it).dataType(String).make()
+        }
+        g.makeKey("rdfs:label").dataType(String).make()
+        g.makeKey("geo:lat").dataType(Float).indexed("search", Vertex).make()
+        g.makeKey("geo:long").dataType(Float).indexed("search", Vertex).make()
+        // TODO: add definitions for all predicates with literal objects
+        [
+            "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
+            "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related",
+            "owl:sameAs", "dbp-owl:wikiPageRedirects",
+        ].each {
+            g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
+        }
+        // TODO: add definitions for all edge types
+        g.commit()
     }
-    g.makeKey("rdfs:label").dataType(String).make()
-    g.makeKey("geo:lat").dataType(Float).indexed("search", Vertex).make()
-    g.makeKey("geo:long").dataType(Float).indexed("search", Vertex).make()
-    // TODO: add definitions for all predicates with literal objects
-    [
-        "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
-        "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related",
-        "owl:sameAs", "dbp-owl:wikiPageRedirects",
-    ].each {
-        g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
-    }
-    // TODO: add definitions for all edge types
-    g.commit()
-
     bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
     bg.setVertexIdKey("qname")
-    // For intermittent loading, may need: bg.setLoadingFromScratch(false)
-    bg.setLoadingFromScratch(false)
+    // Assumption: if "qname" exists, we are not loading from scratch.
+    if (g.getType("qname") != null) {
+        bg.setLoadingFromScratch(false)
+    }
     pg = new PartitionGraph(bg, '_partition', 'dbp')
     return pg
 }
