@@ -50,7 +50,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         ].each {
             g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
         }
-        g.makeLabel("catFlow").sortKey(flow, createdAt).sortOrder(Order.DESC).signature(provenance).make()
+        g.makeLabel("categoryFlow").sortKey(flow, createdAt).sortOrder(Order.DESC).signature(provenance).make()
         // TODO: add definitions for all edge types
         g.commit()
     }
