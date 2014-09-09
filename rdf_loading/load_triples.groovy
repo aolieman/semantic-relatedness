@@ -32,7 +32,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         _partition = g.makeKey("_partition").dataType(String).single().indexed(Vertex).indexed(Edge).make()
         createdAt = g.makeKey("created_at").dataType(Date).make()
         provenance = g.makeKey("provenance").dataType(String).make()
-        flow = g.makeKey("flow").dataType(String).make()
+        flow = g.makeKey("flow").dataType(Double).make()
         langCodes.each {
             g.makeKey("rdfs:label@" + it).dataType(String).make()
             g.makeKey("rdfs:comment@" + it).dataType(String).make()
@@ -50,7 +50,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         ].each {
             g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
         }
-        g.makeLabel("categoryFlow").sortKey(flow, createdAt).sortOrder(Order.DESC).signature(provenance).make()
+        g.makeLabel("catFlow").sortKey(flow, createdAt).sortOrder(Order.DESC).signature(provenance).make()
         // TODO: add definitions for all edge types
         g.commit()
     }
