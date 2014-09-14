@@ -32,6 +32,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         _partition = g.makeKey("_partition").dataType(String).single().indexed(Vertex).indexed(Edge).make()
         createdAt = g.makeKey("created_at").dataType(Date).make()
         provenance = g.makeKey("provenance").dataType(String).make()
+        flow = g.makeKey("flow").dataType(Double).make()
         langCodes.each {
             g.makeKey("rdfs:label@" + it).dataType(String).make()
             g.makeKey("rdfs:comment@" + it).dataType(String).make()
@@ -39,8 +40,8 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
             g.makeKey("georss:point@" + it).dataType(String).make()
         }
         g.makeKey("rdfs:label").dataType(String).make()
-        g.makeKey("geo:lat").dataType(Float).indexed("search", Vertex).make()
-        g.makeKey("geo:long").dataType(Float).indexed("search", Vertex).make()
+        g.makeKey("geo:lat").dataType(Double).indexed("search", Vertex).make()
+        g.makeKey("geo:long").dataType(Double).indexed("search", Vertex).make()
         // TODO: add definitions for all predicates with literal objects
         [
             "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
@@ -49,6 +50,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         ].each {
             g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
         }
+        g.makeLabel("categoryFlow").sortKey(flow, createdAt).sortOrder(Order.DESC).signature(provenance).make()
         // TODO: add definitions for all edge types
         g.commit()
     }
