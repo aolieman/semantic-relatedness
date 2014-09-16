@@ -2,7 +2,7 @@
 # Download DBpedia dumps to the given directory
 
 USGSTR="Usage: download_dumps.sh <download_root_dir> <language_code (e.g. 'en')>"
-DBP_VERSION=3.9
+DBP_VERSION=2014
 echo "Downloading dumps for DBpedia v$DBP_VERSION. Edit the script source to change this version."
 
 if [ -n "$1" ] && [ -n "$2" ]; then
@@ -27,7 +27,7 @@ do
     if [ -s "$fpath" ]; then
         echo "$fpath already exists"
     else
-        url="http://downloads.dbpedia.org/3.9/$lc/$fn"
+        url="http://data.dws.informatik.uni-mannheim.de/dbpedia/$DBP_VERSION/$lc/$fn"
         echo "Downloading $url..."
         wget -P "$target_dir/$lc/" "$url"
     fi
