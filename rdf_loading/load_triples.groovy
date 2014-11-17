@@ -32,9 +32,9 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         qname = mgmt.makePropertyKey("qname").dataType(String).make()
         _partition = mgmt.makePropertyKey("_partition").dataType(String).single().indexed(Vertex).indexed(Edge).make()
         // Define composite (key) indexes
-        mgmt.buildIndex('byqName', Vertex).addKey(qname).unique().buildCompositeIndex()
-        mgmt.buildIndex('vByPartition', Vertex).addKey(_partition).buildCompositeIndex()
-        mgmt.buildIndex('eByPartition', Edge).addKey(_partition).buildCompositeIndex()
+        mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
+        mgmt.buildIndex('v_by_partition', Vertex).addKey(_partition).buildCompositeIndex()
+        mgmt.buildIndex('e_by_partition', Edge).addKey(_partition).buildCompositeIndex()
         
         createdAt = mgmt.makePropertyKey("created_at").dataType(Long).make()
         provenance = mgmt.makePropertyKey("provenance").dataType(String).make()
@@ -58,10 +58,10 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
             "owl:sameAs", "dbp-owl:wikiPageRedirects",
         ].each {
             itLabel = mgmt.makeEdgeLabel(it).signature(createdAt,provenance).make()
-            mgmt.buildEdgeIndex(itLabel,'${it}ByCreatedAt',Direction.BOTH,Order.DESC,createdAt)
+            mgmt.buildEdgeIndex(itLabel,'${it}_by_created_at',Direction.BOTH,Order.DESC,createdAt)
         }
-        categoryFlow = mgmt.makeEdgeLabel("categoryFlow").signature(flow,createdAt,provenance).make()
-        mgmt.buildEdgeIndex(categoryFlow,'catFlowByFlowAndCreatedAt',Direction.BOTH,Order.DESC,flow,createdAt)
+        categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow,createdAt,provenance).make()
+        mgmt.buildEdgeIndex(categoryFlow,'cat_flow_by_flow_and_created_at',Direction.BOTH,Order.DESC,flow,createdAt)
         // TODO: add definitions for all edge types
         mgmt.commit()
     }
@@ -129,7 +129,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
             object = qName(st.object)
             vObj = bg.getVertex(object) ?: bg.addVertex(object)
             edge = bg.addEdge(null, vSubj, vObj, predicate)
-            edge.setProperty("created_at", new Date())
+            edge.setProperty("created_at", System.currentTimeMillis())
             edge.setProperty("provenance", sourceFilename)
         } else {
             // TODO: handle additional literal datatypes
@@ -144,7 +144,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
                 propKey = predicate + '@' + langCode
             }
             vSubj.setProperty(propKey, object)
-            vSubj.setProperty("created_at", new Date())
+            vSubj.setProperty("created_at", System.currentTimeMillis())
             vSubj.setProperty("provenance", sourceFilename)
         }
 
