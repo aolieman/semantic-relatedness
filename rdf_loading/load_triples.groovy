@@ -18,7 +18,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
     conf.setProperty("storage.backend", "cassandra")
     conf.setProperty("storage.hostname", "127.0.0.1")
     conf.setProperty("storage.batch-loading", true)
-    conf.setProperty("storage.infer-schema", false)
+    conf.setProperty("schema.default", null)
     conf.setProperty("storage.index.search.backend", "elasticsearch")
     conf.setProperty("storage.index.search.directory", storageDirectory + "/searchindex")
     conf.setProperty("storage.index.search.client-only", false)
@@ -27,37 +27,48 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
     def g = TitanFactory.open(conf)
     // Types should only be defined once
     // Assumption: if "qname" exists, all keys and labels exist.
-    if (g.getType("qname") == null) {
-        g.makeKey("qname").dataType(String).single().unique().indexed(Vertex).make()
-        _partition = g.makeKey("_partition").dataType(String).single().indexed(Vertex).indexed(Edge).make()
-        createdAt = g.makeKey("created_at").dataType(Date).make()
-        provenance = g.makeKey("provenance").dataType(String).make()
-        flow = g.makeKey("flow").dataType(Double).make()
+    def mgmt = g.getManagementSystem()
+    if (mgmt.containsPropertyKey("qname") == false) {
+        qname = mgmt.makePropertyKey("qname").dataType(String).make()
+        _partition = mgmt.makePropertyKey("_partition").dataType(String).single().indexed(Vertex).indexed(Edge).make()
+        // Define composite (key) indexes
+        mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
+        mgmt.buildIndex('v_by_partition', Vertex).addKey(_partition).buildCompositeIndex()
+        mgmt.buildIndex('e_by_partition', Edge).addKey(_partition).buildCompositeIndex()
+        
+        createdAt = mgmt.makePropertyKey("created_at").dataType(Long).make()
+        provenance = mgmt.makePropertyKey("provenance").dataType(String).make()
+        flow = mgmt.makePropertyKey("flow").dataType(Double).make()
         langCodes.each {
-            g.makeKey("rdfs:label@" + it).dataType(String).make()
-            g.makeKey("rdfs:comment@" + it).dataType(String).make()
-            g.makeKey("skos:prefLabel@" + it).dataType(String).make()
-            g.makeKey("georss:point@" + it).dataType(String).make()
+            mgmt.makePropertyKey("rdfs:label@" + it).dataType(String).make()
+            mgmt.makePropertyKey("rdfs:comment@" + it).dataType(String).make()
+            mgmt.makePropertyKey("skos:prefLabel@" + it).dataType(String).make()
+            mgmt.makePropertyKey("georss:point@" + it).dataType(String).make()
         }
-        g.makeKey("rdfs:label").dataType(String).make()
-        g.makeKey("geo:lat").dataType(Double).indexed("search", Vertex).make()
-        g.makeKey("geo:long").dataType(Double).indexed("search", Vertex).make()
+        mgmt.makePropertyKey("rdfs:label").dataType(String).make()
+        lat = mgmt.makePropertyKey("geo:lat").dataType(Double).make()
+        lon = mgmt.makePropertyKey("geo:long").dataType(Double).make()
+        // Define mixed indexes
+        // mgmt.buildIndex('latlon',Vertex.class).addKey(lat).addKey(lon).buildMixedIndex("search")
+        
         // TODO: add definitions for all predicates with literal objects
         [
             "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
             "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related",
             "owl:sameAs", "dbp-owl:wikiPageRedirects",
         ].each {
-            g.makeLabel(it).sortKey(createdAt).sortOrder(Order.DESC).signature(provenance).make()
+            itLabel = mgmt.makeEdgeLabel(it).signature(createdAt,provenance).make()
+            mgmt.buildEdgeIndex(itLabel,'${it}_by_created_at',Direction.BOTH,Order.DESC,createdAt)
         }
-        g.makeLabel("categoryFlow").sortKey(flow, createdAt).sortOrder(Order.DESC).signature(provenance).make()
+        categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow,createdAt,provenance).make()
+        mgmt.buildEdgeIndex(categoryFlow,'cat_flow_by_flow_and_created_at',Direction.BOTH,Order.DESC,flow,createdAt)
         // TODO: add definitions for all edge types
-        g.commit()
+        mgmt.commit()
     }
     bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
     bg.setVertexIdKey("qname")
     // Assumption: if "qname" exists, we are not loading from scratch.
-    if (g.getType("qname") != null) {
+    if (mgmt.containsPropertyKey("qname")) {
         bg.setLoadingFromScratch(false)
     }
     pg = new PartitionGraph(bg, '_partition', 'dbp')
@@ -76,8 +87,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
         double d = ((long) n / 100) / 10.0;
         boolean isRound = (d * 10) %10 == 0;
         return (d < 1000?
-            ((d > 99.9 || isRound || (!isRound && d > 9.99)?
-             (int) d * 10 / 10 : d + ""
+            ((isRound ? (int) d * 10 / 10 : d + ""
              ) + "" + oom[iteration]) 
             : humanFormat(d, iteration+1));
     }
@@ -118,7 +128,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
             object = qName(st.object)
             vObj = bg.getVertex(object) ?: bg.addVertex(object)
             edge = bg.addEdge(null, vSubj, vObj, predicate)
-            edge.setProperty("created_at", new Date())
+            edge.setProperty("created_at", System.currentTimeMillis())
             edge.setProperty("provenance", sourceFilename)
         } else {
             // TODO: handle additional literal datatypes
@@ -133,7 +143,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
                 propKey = predicate + '@' + langCode
             }
             vSubj.setProperty(propKey, object)
-            vSubj.setProperty("created_at", new Date())
+            vSubj.setProperty("created_at", System.currentTimeMillis())
             vSubj.setProperty("provenance", sourceFilename)
         }
 
