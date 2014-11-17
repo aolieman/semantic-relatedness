@@ -30,7 +30,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
     def mgmt = g.getManagementSystem()
     if (mgmt.containsPropertyKey("qname") == false) {
         qname = mgmt.makePropertyKey("qname").dataType(String).make()
-        _partition = mgmt.makePropertyKey("_partition").dataType(String).single().indexed(Vertex).indexed(Edge).make()
+        _partition = mgmt.makePropertyKey("_partition").dataType(String).make()
         // Define composite (key) indexes
         mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
         mgmt.buildIndex('v_by_partition', Vertex).addKey(_partition).buildCompositeIndex()
