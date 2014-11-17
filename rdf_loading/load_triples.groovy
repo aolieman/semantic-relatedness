@@ -37,7 +37,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         
         createdAt = mgmt.makePropertyKey("created_at").dataType(Long).make()
         provenance = mgmt.makePropertyKey("provenance").dataType(String).make()
-        flow = mgmt.makePropertyKey("flow").dataType(Double).make()
+        flow = mgmt.makePropertyKey("flow").dataType(Precision).make()
         langCodes.each {
             mgmt.makePropertyKey("rdfs:label@" + it).dataType(String).make()
             mgmt.makePropertyKey("rdfs:comment@" + it).dataType(String).make()
