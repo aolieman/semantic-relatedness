@@ -87,8 +87,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
         double d = ((long) n / 100) / 10.0;
         boolean isRound = (d * 10) %10 == 0;
         return (d < 1000?
-            ((d > 99.9 || isRound || (!isRound && d > 9.99)?
-             (int) d * 10 / 10 : d + ""
+            ((isRound ? (int) d * 10 / 10 : d + ""
              ) + "" + oom[iteration]) 
             : humanFormat(d, iteration+1));
     }
