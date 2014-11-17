@@ -62,7 +62,6 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow,createdAt,provenance).make()
         mgmt.buildEdgeIndex(categoryFlow,'cat_flow_by_flow_and_created_at',Direction.BOTH,Order.DESC,flow,createdAt)
         // TODO: add definitions for all edge types
-        mgmt.set("ids.block-size",100000)
         mgmt.commit()
     }
     bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
