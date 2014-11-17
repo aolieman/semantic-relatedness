@@ -57,7 +57,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
             "owl:sameAs", "dbp-owl:wikiPageRedirects",
         ].each {
             itLabel = mgmt.makeEdgeLabel(it).signature(createdAt,provenance).make()
-            mgmt.buildEdgeIndex(itLabel,'${it}_by_created_at',Direction.BOTH,Order.DESC,createdAt)
+            mgmt.buildEdgeIndex(itLabel,'${it.replace(':', '_')}_by_created_at', Direction.BOTH,Order.DESC,createdAt)
         }
         categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow,createdAt,provenance).make()
         mgmt.buildEdgeIndex(categoryFlow,'cat_flow_by_flow_and_created_at',Direction.BOTH,Order.DESC,flow,createdAt)
