@@ -45,6 +45,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
             mgmt.makePropertyKey("georss:point@" + it).dataType(String).make()
         }
         mgmt.makePropertyKey("rdfs:label").dataType(String).make()
+        mgmt.makePropertyKey("georss:point").dataType(String).make()
         lat = mgmt.makePropertyKey("geo:lat").dataType(Double).make()
         lon = mgmt.makePropertyKey("geo:long").dataType(Double).make()
         // Define mixed indexes
@@ -139,7 +140,11 @@ class StatementsToGraphDB extends RDFHandlerBase {
             } else {
                 object = st.object.getLabel()
                 langCode = st.object.getLanguage()
-                propKey = predicate + '@' + langCode
+                if (langCode) {
+                    propKey = predicate + '@' + langCode
+                } else {
+                    propKey = predicate
+                }
             }
             vSubj.setProperty(propKey, object)
             vSubj.setProperty("created_at", System.currentTimeMillis())
