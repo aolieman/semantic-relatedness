@@ -104,13 +104,16 @@ class StatementsToGraphDB extends RDFHandlerBase {
         'http://schema.org/': 'schema',
         'http://rdf.freebase.com/ns/': 'freebase',
         'http://www.wikidata.org/entity/': 'wikidata',
+        'http://wikidata.org/entity/': 'wikidata',
         'http://purl.org/dc/terms/': 'dcterms',
         'http://www.w3.org/2004/02/skos/core#': 'skos',
         'http://purl.org/ontology/bibo/': 'bibo',
         'http://www.opengis.net/gml/': 'gml',
         'http://www.w3.org/2003/01/geo/wgs84_pos#': 'geo',
         'http://www.georss.org/georss/': 'georss',
-        'http://www.w3.org/2004/02/skos/core#': 'skos'
+        'http://www.w3.org/2004/02/skos/core#': 'skos',
+        'http://www.ontologydesignpatterns.org/ont/d0.owl#': 'odp-d0',
+        'http://www.ontologydesignpatterns.org/ont/dul/DUL.owl#': 'odp-dul'
     ]
 
     def unknownNamespaces = new HashSet()
