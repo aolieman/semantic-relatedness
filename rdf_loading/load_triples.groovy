@@ -43,8 +43,14 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
             mgmt.makePropertyKey("rdfs:comment@" + it).dataType(String).make()
             mgmt.makePropertyKey("skos:prefLabel@" + it).dataType(String).make()
             mgmt.makePropertyKey("georss:point@" + it).dataType(String).make()
+            mgmt.makePropertyKey("foaf:nick@" + it).dataType(String).make()
+            mgmt.makePropertyKey("foaf:name@" + it).dataType(String).make()
+            mgmt.makePropertyKey("dce:language@" + it).dataType(String).make()
         }
         mgmt.makePropertyKey("rdfs:label").dataType(String).make()
+        mgmt.makePropertyKey("foaf:homepage").dataType(String).make()
+        mgmt.makePropertyKey("foaf:name").dataType(String).make()
+        mgmt.makePropertyKey("dce:description").dataType(String).make()
         mgmt.makePropertyKey("georss:point").dataType(String).make()
         lat = mgmt.makePropertyKey("geo:lat").dataType(Double).make()
         lon = mgmt.makePropertyKey("geo:long").dataType(Double).make()
@@ -106,6 +112,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
         'http://www.wikidata.org/entity/': 'wikidata',
         'http://wikidata.org/entity/': 'wikidata',
         'http://purl.org/dc/terms/': 'dcterms',
+        'http://purl.org/dc/elements/1.1/': 'dce',
         'http://www.w3.org/2004/02/skos/core#': 'skos',
         'http://purl.org/ontology/bibo/': 'bibo',
         'http://www.opengis.net/gml/': 'gml',
