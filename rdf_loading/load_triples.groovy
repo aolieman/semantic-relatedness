@@ -245,6 +245,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
     bg.setVertexIdKey("qname")
     // Assumption: if "qname" exists, we are not loading from scratch.
+    mgmt = g.getManagementSystem()
     if (mgmt.containsPropertyKey("qname")) {
         bg.setLoadingFromScratch(false)
     }
