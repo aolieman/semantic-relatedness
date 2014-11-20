@@ -12,14 +12,13 @@ import org.openrdf.model.*
 import org.apache.commons.compress.compressors.*
 
 // Titan configuration & schema definitions
-def prepareTitan(String storageDirectory, ArrayList langCodes) {
+def prepareTitan(String inferredSchema, ArrayList langCodes) {
     def conf = new BaseConfiguration()
     conf.setProperty("storage.backend", "cassandra")
     conf.setProperty("storage.hostname", "127.0.0.1")
     conf.setProperty("storage.batch-loading", true)
     conf.setProperty("schema.default", null)
     conf.setProperty("storage.index.search.backend", "elasticsearch")
-    conf.setProperty("storage.index.search.directory", storageDirectory + "/searchindex")
     conf.setProperty("storage.index.search.client-only", false)
     conf.setProperty("storage.index.search.local-mode", true)
       
@@ -28,6 +27,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
     // Assumption: if "qname" exists, all keys and labels exist.
     def mgmt = g.getManagementSystem()
     if (mgmt.containsPropertyKey("qname") == false) {
+        // Make property keys
         qname = mgmt.makePropertyKey("qname").dataType(String).make()
         _partition = mgmt.makePropertyKey("_partition").dataType(String).make()
         // Define composite (key) indexes
@@ -57,7 +57,7 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         // Define mixed indexes
         // mgmt.buildIndex('latlon',Vertex.class).addKey(lat).addKey(lon).buildMixedIndex("search")
         
-        // TODO: add definitions for all predicates with literal objects
+        // Make edge labels
         [
             "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
             "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related",
@@ -68,9 +68,49 @@ def prepareTitan(String storageDirectory, ArrayList langCodes) {
         }
         categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow,createdAt,provenance).make()
         mgmt.buildEdgeIndex(categoryFlow,'cat_flow_by_flow_and_created_at',Direction.BOTH,Order.DESC,flow,createdAt)
-        // TODO: add definitions for all edge types
-        mgmt.commit()
     }
+    
+    // Make keys and labels from an inferred datatype schema
+    def namespaces = new StatementsToGraphDB(g).namespaces
+    def createdAt = mgmt.getPropertyKey("created_at")
+    def provenance = mgmt.getPropertyKey("provenance")
+    new File(inferredSchema).eachLine { line ->
+        def fields = line.split()
+        def predUri = fields[0], range = fields[1]
+        def lname = predUri.split(/[\/#]/)[-1]
+        def nspc = predUri[0..-(lname.size()+1)]
+        def label = namespaces[nspc] + lname
+        if (range[0] == "@") {
+            label += range
+            range = "string"
+        }
+        if (mgmt.containsRelationType(label) == false) {
+            if (range == "uri") {
+                mgmt.makeEdgeLabel(label).signature(createdAt,provenance).make()            
+            } else if (range == "string") {
+                mgmt.makePropertyKey(label).dataType(String).make()
+            } else if (range[0..3] == "http") {
+                def lname = range.split(/[\/#]/)[-1]
+                def nspc = range[0..-(lname.size()+1)]
+                if (lname == "date") {
+                    mgmt.makePropertyKey(label).dataType(Date).make()
+                } else if (lname == "double") {
+                    mgmt.makePropertyKey(label).dataType(Double).make()
+                } else if (lname == "float") {
+                    mgmt.makePropertyKey(label).dataType(Float).make()
+                } else if (["gYear", "integer", "nonNegativeInteger", "positiveInteger"].contains(lname)) {
+                    mgmt.makePropertyKey(label).dataType(Integer).make()
+                } else if (nspc == "http://dbpedia.org/datatype/") {
+                    mgmt.makePropertyKey(label).dataType(String).make()
+                } else {
+                    throw new Exception("Datatype ${range} not recognized")
+                }
+            }
+        }
+    }
+    
+    mgmt.commit()
+    
     bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
     bg.setVertexIdKey("qname")
     // Assumption: if "qname" exists, we are not loading from scratch.
@@ -100,9 +140,11 @@ class StatementsToGraphDB extends RDFHandlerBase {
 
     // Define known namespaces with their prefix
     def namespaces = [
+        'http://www.w3.org/2001/XMLSchema#': 'xsd',
         'http://dbpedia.org/resource/': 'dbp',
         'http://dbpedia.org/ontology/': 'dbp-owl',
         'http://dbpedia.org/property/': 'dbpprop',
+        'http://dbpedia.org/datatype/': 'dbp-dt',
         'http://www.w3.org/1999/02/22-rdf-syntax-ns#': 'rdf',
         'http://www.w3.org/2000/01/rdf-schema#': 'rdfs',
         'http://www.w3.org/2002/07/owl#': 'owl',
