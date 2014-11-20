@@ -11,116 +11,6 @@ import org.openrdf.rio.helpers.*
 import org.openrdf.model.*
 import org.apache.commons.compress.compressors.*
 
-// Titan configuration & schema definitions
-def prepareTitan(String inferredSchema, ArrayList langCodes) {
-    def conf = new BaseConfiguration()
-    conf.setProperty("storage.backend", "cassandra")
-    conf.setProperty("storage.hostname", "127.0.0.1")
-    conf.setProperty("storage.batch-loading", true)
-    conf.setProperty("schema.default", null)
-    conf.setProperty("storage.index.search.backend", "elasticsearch")
-    conf.setProperty("storage.index.search.client-only", false)
-    conf.setProperty("storage.index.search.local-mode", true)
-      
-    def g = TitanFactory.open(conf)
-    // Types should only be defined once
-    // Assumption: if "qname" exists, all keys and labels exist.
-    def mgmt = g.getManagementSystem()
-    if (mgmt.containsPropertyKey("qname") == false) {
-        // Make property keys
-        qname = mgmt.makePropertyKey("qname").dataType(String).make()
-        _partition = mgmt.makePropertyKey("_partition").dataType(String).make()
-        // Define composite (key) indexes
-        mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
-        mgmt.buildIndex('v_by_partition', Vertex).addKey(_partition).buildCompositeIndex()
-        mgmt.buildIndex('e_by_partition', Edge).addKey(_partition).buildCompositeIndex()
-        
-        createdAt = mgmt.makePropertyKey("created_at").dataType(Long).make()
-        provenance = mgmt.makePropertyKey("provenance").dataType(String).make()
-        flow = mgmt.makePropertyKey("flow").dataType(Precision).make()
-        langCodes.each {
-            mgmt.makePropertyKey("rdfs:label@" + it).dataType(String).make()
-            mgmt.makePropertyKey("rdfs:comment@" + it).dataType(String).make()
-            mgmt.makePropertyKey("skos:prefLabel@" + it).dataType(String).make()
-            mgmt.makePropertyKey("georss:point@" + it).dataType(String).make()
-            mgmt.makePropertyKey("foaf:nick@" + it).dataType(String).make()
-            mgmt.makePropertyKey("foaf:name@" + it).dataType(String).make()
-            mgmt.makePropertyKey("dce:language@" + it).dataType(String).make()
-        }
-        mgmt.makePropertyKey("rdfs:label").dataType(String).make()
-        mgmt.makePropertyKey("foaf:homepage").dataType(String).make()
-        mgmt.makePropertyKey("foaf:name").dataType(String).make()
-        mgmt.makePropertyKey("dce:description").dataType(String).make()
-        mgmt.makePropertyKey("georss:point").dataType(String).make()
-        lat = mgmt.makePropertyKey("geo:lat").dataType(Double).make()
-        lon = mgmt.makePropertyKey("geo:long").dataType(Double).make()
-        // Define mixed indexes
-        // mgmt.buildIndex('latlon',Vertex.class).addKey(lat).addKey(lon).buildMixedIndex("search")
-        
-        // Make edge labels
-        [
-            "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
-            "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related",
-            "owl:sameAs", "dbp-owl:wikiPageRedirects",
-        ].each {
-            itLabel = mgmt.makeEdgeLabel(it).signature(createdAt,provenance).make()
-            mgmt.buildEdgeIndex(itLabel,"${it.replace(':', '_')}_by_created_at", Direction.BOTH,Order.DESC,createdAt)
-        }
-        categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow,createdAt,provenance).make()
-        mgmt.buildEdgeIndex(categoryFlow,'cat_flow_by_flow_and_created_at',Direction.BOTH,Order.DESC,flow,createdAt)
-    }
-    
-    // Make keys and labels from an inferred datatype schema
-    def namespaces = new StatementsToGraphDB(g).namespaces
-    def createdAt = mgmt.getPropertyKey("created_at")
-    def provenance = mgmt.getPropertyKey("provenance")
-    new File(inferredSchema).eachLine { line ->
-        def fields = line.split()
-        def predUri = fields[0], range = fields[1]
-        def lname = predUri.split(/[\/#]/)[-1]
-        def nspc = predUri[0..-(lname.size()+1)]
-        def label = namespaces[nspc] + lname
-        if (range[0] == "@") {
-            label += range
-            range = "string"
-        }
-        if (mgmt.containsRelationType(label) == false) {
-            if (range == "uri") {
-                mgmt.makeEdgeLabel(label).signature(createdAt,provenance).make()            
-            } else if (range == "string") {
-                mgmt.makePropertyKey(label).dataType(String).make()
-            } else if (range[0..3] == "http") {
-                def lname = range.split(/[\/#]/)[-1]
-                def nspc = range[0..-(lname.size()+1)]
-                if (lname == "date") {
-                    mgmt.makePropertyKey(label).dataType(Date).make()
-                } else if (lname == "double") {
-                    mgmt.makePropertyKey(label).dataType(Double).make()
-                } else if (lname == "float") {
-                    mgmt.makePropertyKey(label).dataType(Float).make()
-                } else if (["gYear", "integer", "nonNegativeInteger", "positiveInteger"].contains(lname)) {
-                    mgmt.makePropertyKey(label).dataType(Integer).make()
-                } else if (nspc == "http://dbpedia.org/datatype/") {
-                    mgmt.makePropertyKey(label).dataType(String).make()
-                } else {
-                    throw new Exception("Datatype ${range} not recognized")
-                }
-            }
-        }
-    }
-    
-    mgmt.commit()
-    
-    bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
-    bg.setVertexIdKey("qname")
-    // Assumption: if "qname" exists, we are not loading from scratch.
-    if (mgmt.containsPropertyKey("qname")) {
-        bg.setLoadingFromScratch(false)
-    }
-    pg = new PartitionGraph(bg, '_partition', 'dbp')
-    return pg
-}
-
 // Creates vertices and edges from RDF statements
 class StatementsToGraphDB extends RDFHandlerBase {
     def bg, sourceFilename
@@ -251,6 +141,115 @@ class Helpers {
     }
 }
 
+// Titan configuration & schema definitions
+def prepareTitan(String inferredSchema, ArrayList langCodes) {
+    def conf = new BaseConfiguration()
+    conf.setProperty("storage.backend", "cassandra")
+    conf.setProperty("storage.hostname", "127.0.0.1")
+    conf.setProperty("storage.batch-loading", true)
+    conf.setProperty("schema.default", null)
+    conf.setProperty("storage.index.search.backend", "elasticsearch")
+    conf.setProperty("storage.index.search.client-only", false)
+    conf.setProperty("storage.index.search.local-mode", true)
+      
+    def g = TitanFactory.open(conf)
+    // Types should only be defined once
+    // Assumption: if "qname" exists, all keys and labels exist.
+    def mgmt = g.getManagementSystem()
+    if (mgmt.containsPropertyKey("qname") == false) {
+        // Make property keys
+        qname = mgmt.makePropertyKey("qname").dataType(String).make()
+        _partition = mgmt.makePropertyKey("_partition").dataType(String).make()
+        // Define composite (key) indexes
+        mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
+        mgmt.buildIndex('v_by_partition', Vertex).addKey(_partition).buildCompositeIndex()
+        mgmt.buildIndex('e_by_partition', Edge).addKey(_partition).buildCompositeIndex()
+        
+        createdAt = mgmt.makePropertyKey("created_at").dataType(Long).make()
+        provenance = mgmt.makePropertyKey("provenance").dataType(String).make()
+        flow = mgmt.makePropertyKey("flow").dataType(Precision).make()
+        langCodes.each {
+            mgmt.makePropertyKey("rdfs:label@" + it).dataType(String).make()
+            mgmt.makePropertyKey("rdfs:comment@" + it).dataType(String).make()
+            mgmt.makePropertyKey("skos:prefLabel@" + it).dataType(String).make()
+            mgmt.makePropertyKey("georss:point@" + it).dataType(String).make()
+            mgmt.makePropertyKey("foaf:nick@" + it).dataType(String).make()
+            mgmt.makePropertyKey("foaf:name@" + it).dataType(String).make()
+            mgmt.makePropertyKey("dce:language@" + it).dataType(String).make()
+        }
+        mgmt.makePropertyKey("rdfs:label").dataType(String).make()
+        mgmt.makePropertyKey("foaf:homepage").dataType(String).make()
+        mgmt.makePropertyKey("foaf:name").dataType(String).make()
+        mgmt.makePropertyKey("dce:description").dataType(String).make()
+        mgmt.makePropertyKey("georss:point").dataType(String).make()
+        lat = mgmt.makePropertyKey("geo:lat").dataType(Double).make()
+        lon = mgmt.makePropertyKey("geo:long").dataType(Double).make()
+        // Define mixed indexes
+        // mgmt.buildIndex('latlon',Vertex.class).addKey(lat).addKey(lon).buildMixedIndex("search")
+        
+        // Make edge labels
+        [
+            "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
+            "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related",
+            "owl:sameAs", "dbp-owl:wikiPageRedirects",
+        ].each {
+            itLabel = mgmt.makeEdgeLabel(it).signature(createdAt,provenance).make()
+            mgmt.buildEdgeIndex(itLabel,"${it.replace(':', '_')}_by_created_at", Direction.BOTH,Order.DESC,createdAt)
+        }
+        categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow,createdAt,provenance).make()
+        mgmt.buildEdgeIndex(categoryFlow,'cat_flow_by_flow_and_created_at',Direction.BOTH,Order.DESC,flow,createdAt)
+    }
+    
+    // Make keys and labels from an inferred datatype schema
+    def namespaces = new StatementsToGraphDB(g).namespaces
+    def createdAt = mgmt.getPropertyKey("created_at")
+    def provenance = mgmt.getPropertyKey("provenance")
+    new File(inferredSchema).eachLine { line ->
+        def fields = line.split()
+        def predUri = fields[0], range = fields[1]
+        def lname = predUri.split(/[\/#]/)[-1]
+        def nspc = predUri[0..-(lname.size()+1)]
+        def label = namespaces[nspc] + lname
+        if (range[0] == "@") {
+            label += range
+            range = "string"
+        }
+        if (mgmt.containsRelationType(label) == false) {
+            if (range == "uri") {
+                mgmt.makeEdgeLabel(label).signature(createdAt,provenance).make()            
+            } else if (range == "string") {
+                mgmt.makePropertyKey(label).dataType(String).make()
+            } else if (range[0..3] == "http") {
+                def dtLname = range.split(/[\/#]/)[-1]
+                def dtNspc = range[0..-(dtLname.size()+1)]
+                if (dtLname == "date") {
+                    mgmt.makePropertyKey(label).dataType(Date).make()
+                } else if (dtLname == "double") {
+                    mgmt.makePropertyKey(label).dataType(Double).make()
+                } else if (dtLname == "float") {
+                    mgmt.makePropertyKey(label).dataType(Float).make()
+                } else if (["gYear", "integer", "nonNegativeInteger", "positiveInteger"].contains(dtLname)) {
+                    mgmt.makePropertyKey(label).dataType(Integer).make()
+                } else if (dtNspc == "http://dbpedia.org/datatype/") {
+                    mgmt.makePropertyKey(label).dataType(String).make()
+                } else {
+                    throw new Exception("Datatype ${range} not recognized")
+                }
+            }
+        }
+    }
+    
+    mgmt.commit()
+    
+    bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
+    bg.setVertexIdKey("qname")
+    // Assumption: if "qname" exists, we are not loading from scratch.
+    if (mgmt.containsPropertyKey("qname")) {
+        bg.setLoadingFromScratch(false)
+    }
+    pg = new PartitionGraph(bg, '_partition', 'dbp')
+    return pg
+}
 
 def loadRdfFromFile(Graph graph, String filepath) {
     // Initialize a stream that feeds bz2-compressed triples
