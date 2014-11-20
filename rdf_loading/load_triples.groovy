@@ -209,7 +209,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
         def predUri = fields[0], range = fields[1]
         def lname = predUri.split(/[\/#]/)[-1]
         def nspc = predUri[0..-(lname.size()+1)]
-        def label = namespaces[nspc] + lname
+        def label = "${namespaces[nspc]}:${lname}"
         if (range[0] == "@") {
             label += range
             range = "string"
