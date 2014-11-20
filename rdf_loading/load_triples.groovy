@@ -201,7 +201,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     }
     
     // Make keys and labels from an inferred datatype schema
-    def namespaces = new StatementsToGraphDB(g).namespaces
+    def namespaces = new StatementsToGraphDB(g, "schema").namespaces
     def createdAt = mgmt.getPropertyKey("created_at")
     def provenance = mgmt.getPropertyKey("provenance")
     new File(inferredSchema).eachLine { line ->
@@ -215,6 +215,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
             range = "string"
         }
         if (mgmt.containsRelationType(label) == false) {
+            println "..making RelationType ${label} for range ${range}"
             if (range == "uri") {
                 mgmt.makeEdgeLabel(label).signature(createdAt,provenance).make()            
             } else if (range == "string") {
