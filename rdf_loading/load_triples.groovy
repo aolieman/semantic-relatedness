@@ -191,7 +191,6 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
             mgmt.makePropertyKey("dce:language@" + it).dataType(String).make()
         }
         mgmt.makePropertyKey("rdfs:label").dataType(String).make()
-        mgmt.makePropertyKey("foaf:homepage").dataType(String).make()
         mgmt.makePropertyKey("foaf:name").dataType(String).make()
         mgmt.makePropertyKey("dce:description").dataType(String).make()
         mgmt.makePropertyKey("georss:point").dataType(String).make()
