@@ -80,11 +80,11 @@ class StatementsToGraphDB extends RDFHandlerBase {
             // http://openrdf.callimachus.net/sesame/2.7/apidocs/org/openrdf/model/impl/LiteralImpl.html
             def datatype = st.object.getDatatype()
             propKey = predicate
-            if (datatype && datatype.getLocalName() == "float") {
+            if (datatype?.getLocalName() == "float") {
                 object = st.object.floatValue()
-            } else if (datatype && datatype.getLocalName() == "date") {
+            } else if (datatype?.getLocalName() == "date") {
                 object = dtc.parseDate(st.object.getLabel()).getTime()
-            } else if (datatype && datatype.getLocalName() == "double") {
+            } else if (datatype?.getLocalName() == "double") {
                 object = st.object.doubleValue()
             } else if ( datatype && 
                 ["gYear", "integer", "nonNegativeInteger", "positiveInteger"].contains(datatype.getLocalName())
@@ -92,7 +92,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
                 def bint = st.object.integerValue()
                 // if the value is to large for Integer, assign the min value
                 object = bint == (int) bint ? bint : Integer.MIN_VALUE
-            } else if (datatype && datatype.getNamespace() == "http://dbpedia.org/datatype/") {
+            } else if (datatype?.getNamespace() == "http://dbpedia.org/datatype/") {
                 object = "${st.object.getLabel()}^^${qName(datatype)}"
             } else {
                 object = st.object.getLabel()
@@ -130,6 +130,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
                 prefix = 'dbp-' + matcher[0][1]
             } catch (IndexOutOfBoundsException) {
                 // warn about unknown namespace when first encountered
+                // TODO: optionally forget about unknown namespaces (e.g. when loading properties)
                 if ( !(nspc in unknownNamespaces) ) {
                     unknownNamespaces += nspc
                     println('Unknown namespace: ' + nspc)
