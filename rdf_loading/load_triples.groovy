@@ -10,6 +10,7 @@ import org.openrdf.rio.ntriples.*
 import org.openrdf.rio.helpers.*
 import org.openrdf.model.*
 import org.apache.commons.compress.compressors.*
+import javax.xml.bind.DatatypeConverter
 
 // Creates vertices and edges from RDF statements
 class StatementsToGraphDB extends RDFHandlerBase {
@@ -58,6 +59,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
     def unknownNamespaces = new HashSet()
    
     def countedStatements = [:].withDefault{0}
+    
+    def dtc = new DatatypeConverter()
    
     void handleStatement(Statement st) {
         def subject = qName(st.subject)
@@ -76,16 +79,26 @@ class StatementsToGraphDB extends RDFHandlerBase {
             // TODO: handle additional literal datatypes
             // http://openrdf.callimachus.net/sesame/2.7/apidocs/org/openrdf/model/impl/LiteralImpl.html
             def datatype = st.object.getDatatype()
+            propKey = predicate
             if (datatype && datatype.getLocalName() == "float") {
                 object = st.object.floatValue()
-                propKey = predicate
+            } else if (datatype && datatype.getLocalName() == "date") {
+                object = dtc.parseDate(st.object.getLabel()).getTime()
+            } else if (datatype && datatype.getLocalName() == "double") {
+                object = st.object.doubleValue()
+            } else if ( datatype && 
+                ["gYear", "integer", "nonNegativeInteger", "positiveInteger"].contains(datatype.getLocalName())
+            ) {
+                bint = st.object.integerValue()
+                // if the value is to large for Integer, assign the min value
+                object = bint == (int) bint ? bint : Integer.MIN_VALUE
+            } else if (datatype && datatype.getNamespace() == "http://dbpedia.org/datatype/") {
+                object = "${st.object.getLabel()}^^${qName(datatype)}"
             } else {
                 object = st.object.getLabel()
                 langCode = st.object.getLanguage()
                 if (langCode) {
                     propKey = predicate + '@' + langCode
-                } else {
-                    propKey = predicate
                 }
             }
             vSubj.setProperty(propKey, object)
