@@ -89,7 +89,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
             } else if ( datatype && 
                 ["gYear", "integer", "nonNegativeInteger", "positiveInteger"].contains(datatype.getLocalName())
             ) {
-                bint = st.object.integerValue()
+                def bint = st.object.integerValue()
                 // if the value is to large for Integer, assign the min value
                 object = bint == (int) bint ? bint : Integer.MIN_VALUE
             } else if (datatype && datatype.getNamespace() == "http://dbpedia.org/datatype/") {
