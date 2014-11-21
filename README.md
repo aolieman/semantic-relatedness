@@ -1,9 +1,9 @@
 Semantic Relatedness
 ====================
 
-Facilitates relatedness measurements for collective disambiguation.
+Facilitates relatedness measurements between KB entries for, e.g., collective disambiguation.
 
-Semantic Relatedness depends on a knowledge base to perform relatedness measurements between entities. At this stage of developments, the module includes a bulk loading script that facilitates loading RDF triples from DBpedia to a local Graph DB. Other knowledge bases may be supported in the future.
+Semantic Relatedness depends on a knowledge base to perform relatedness measurements between entities. At this stage of development, the module includes a bulk loading script that facilitates loading RDF triples from DBpedia to a local Graph DB. Other knowledge bases may be supported in the future.
 
 Work on this module has been supported by:
 - [University of Amsterdam](http://www.illc.uva.nl/)
@@ -24,8 +24,8 @@ $ ./titan/bin/gremlin.sh /path/to/semantic-relatedness/rdf_loading/load_triples.
          (o o)
 -----oOOo-(_)-oOOo-----
 
-gremlin> bg = prepareTitan("/path/to/storage_directory", ['en', 'nl'])
-gremlin> handler = loadRdfFromFile(bg, "/path/to/dbpedia_dumps/v3.9/en/skos_categories_en.nt.bz2")
+gremlin> bg = prepareTitan("semantic-relatedness/rdf_loading/inferred_schema.txt", ['en', 'nl'])
+gremlin> handler = loadRdfFromFile(bg, "/path/to/dbpedia_dumps/v2014/en/skos_categories_en.nt.bz2")
 ```
 
 License
