@@ -86,6 +86,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
                 object = dtc.parseDate(st.object.getLabel()).getTime()
             } else if (datatype?.getLocalName() == "double") {
                 object = st.object.doubleValue()
+            } else if (datatype?.getLocalName() == "boolean") {
+                object = st.object.booleanValue()
             } else if ( datatype && 
                 ["gYear", "integer", "nonNegativeInteger", "positiveInteger"].contains(datatype.getLocalName())
             ) {
@@ -242,6 +244,8 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
                     mgmt.makePropertyKey(label).dataType(Double).make()
                 } else if (dtLname == "float") {
                     mgmt.makePropertyKey(label).dataType(Float).make()
+                } else if (dtLname == "boolean") {
+                    mgmt.makePropertyKey(label).dataType(Boolean).make()
                 } else if (["gYear", "integer", "nonNegativeInteger", "positiveInteger"].contains(dtLname)) {
                     mgmt.makePropertyKey(label).dataType(Integer).make()
                 } else if (dtNspc == "http://dbpedia.org/datatype/") {
