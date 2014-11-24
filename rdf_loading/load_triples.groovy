@@ -82,7 +82,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
             propKey = predicate
             if (datatype?.getLocalName() == "float") {
                 object = st.object.floatValue()
-            } else if (datatype?.getLocalName() == "date") {
+            } else if (datatype?.getLocalName() in ["date", "gYearMonth"]) {
                 object = dtc.parseDate(st.object.getLabel()).getTime()
             } else if (datatype?.getLocalName() == "double") {
                 object = st.object.doubleValue()
@@ -132,7 +132,6 @@ class StatementsToGraphDB extends RDFHandlerBase {
                 prefix = 'dbp-' + matcher[0][1]
             } catch (IndexOutOfBoundsException) {
                 // warn about unknown namespace when first encountered
-                // TODO: optionally forget about unknown namespaces (e.g. when loading properties)
                 if ( validateNamespace && !(nspc in unknownNamespaces) ) {
                     unknownNamespaces += nspc
                     println('Unknown namespace: ' + nspc)
@@ -238,7 +237,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
             } else if (range[0..3] == "http") {
                 def dtLname = range.split(/[\/#]/)[-1]
                 def dtNspc = range[0..-(dtLname.size()+1)]
-                if (dtLname == "date") {
+                if (dtLname in ["date", "gYearMonth"]) {
                     mgmt.makePropertyKey(label).dataType(Date).make()
                 } else if (dtLname == "double") {
                     mgmt.makePropertyKey(label).dataType(Double).make()
@@ -248,7 +247,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
                     mgmt.makePropertyKey(label).dataType(Boolean).make()
                 } else if (["gYear", "integer", "nonNegativeInteger", "positiveInteger"].contains(dtLname)) {
                     mgmt.makePropertyKey(label).dataType(Integer).make()
-                } else if (dtNspc == "http://dbpedia.org/datatype/") {
+                } else if (dtNspc == "http://dbpedia.org/datatype/" || dtLname == "anyURI") {
                     mgmt.makePropertyKey(label).dataType(String).make()
                 } else {
                     throw new Exception("Datatype ${range} not recognized")
