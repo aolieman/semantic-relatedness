@@ -70,7 +70,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
         def vSubj = bg.getVertex(subject) ?: bg.addVertex(subject)
 
         if (st.object instanceof URI) {
-            object = qName(st.object, validateNamespace=false)
+            object = qName(st.object, false)
             vObj = bg.getVertex(object) ?: bg.addVertex(object)
             edge = bg.addEdge(null, vSubj, vObj, predicate)
             edge.setProperty("created_at", System.currentTimeMillis())
