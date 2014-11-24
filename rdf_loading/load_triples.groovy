@@ -14,8 +14,8 @@ import javax.xml.bind.DatatypeConverter
 
 // Creates vertices and edges from RDF statements
 class StatementsToGraphDB extends RDFHandlerBase {
-    def bg, sourceFilename
-    StatementsToGraphDB(g, sFn) { bg = g; sourceFilename = sFn }
+    def bg, sourceFilename, skipLines
+    StatementsToGraphDB(g, sFn, skL) { bg = g; sourceFilename = sFn; skipLines = skL}
 
     def tripleCount = 0L
     // Human formatting for large numbers
@@ -63,6 +63,9 @@ class StatementsToGraphDB extends RDFHandlerBase {
     def dtc = new DatatypeConverter()
    
     void handleStatement(Statement st) {
+        // Return early if this line should be skipped
+        if (tripleCount < skipLines) {return}    
+    
         def subject = qName(st.subject)
         def predicate = qName(st.predicate)
         def object, vObj, edge, langCode, propKey
@@ -269,7 +272,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     return pg
 }
 
-def loadRdfFromFile(Graph graph, String filepath) {
+def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0) {
     // Initialize a stream that feeds bz2-compressed triples
     def fin = new FileInputStream(filepath)
     def bis = new BufferedInputStream(fin)
@@ -278,10 +281,14 @@ def loadRdfFromFile(Graph graph, String filepath) {
     def cis = cisFactory.createCompressorInputStream(CompressorStreamFactory.BZIP2, bis)
 
     def sourceFilename = filepath.split('/')[-1][0..-5]
-    def graphCommitter = new StatementsToGraphDB(graph, sourceFilename)
+    def graphCommitter = new StatementsToGraphDB(graph, sourceFilename, skipLines)
     def rdfParser = new NTriplesParser()
     rdfParser.setRDFHandler(graphCommitter)
     def startTime = System.currentTimeMillis()
+    
+    if (skipLines) {
+        println "Skipping the first ${skipLines} triples/lines..."
+    }
 
     try {
         rdfParser.parse(cis, "http://dbpedia.org/resource/")
