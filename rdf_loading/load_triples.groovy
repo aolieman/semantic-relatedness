@@ -70,7 +70,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
         def vSubj = bg.getVertex(subject) ?: bg.addVertex(subject)
 
         if (st.object instanceof URI) {
-            object = qName(st.object)
+            object = qName(st.object, validateNamespace=false)
             vObj = bg.getVertex(object) ?: bg.addVertex(object)
             edge = bg.addEdge(null, vSubj, vObj, predicate)
             edge.setProperty("created_at", System.currentTimeMillis())
@@ -117,7 +117,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
         return countedStatements.sort { a, b -> b.value <=> a.value }
     }
 
-    def qName(URI uri) {
+    def qName(URI uri, Boolean validateNamespace=true) {
         def nspc = uri.getNamespace()
         if (nspc.split("/resource/").size() > 1) {
             nspc = nspc[0..(-nspc.split("/resource/")[-1].size()-1)]
@@ -131,7 +131,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
             } catch (IndexOutOfBoundsException) {
                 // warn about unknown namespace when first encountered
                 // TODO: optionally forget about unknown namespaces (e.g. when loading properties)
-                if ( !(nspc in unknownNamespaces) ) {
+                if ( validateNamespace && !(nspc in unknownNamespaces) ) {
                     unknownNamespaces += nspc
                     println('Unknown namespace: ' + nspc)
                 }
