@@ -63,8 +63,14 @@ class StatementsToGraphDB extends RDFHandlerBase {
     def dtc = new DatatypeConverter()
    
     void handleStatement(Statement st) {
-        // Return early if this line should be skipped
-        if (tripleCount < skipLines) {return}    
+        // Increment triple count and return early if this line should be skipped
+        if (++tripleCount < skipLines) {
+            if (tripleCount%100000L == 0L) {
+                println( (new Date()).toString() + \
+                " Skipped ${humanFormat(tripleCount)} triples")
+            }
+            return
+        }    
     
         def subject = qName(st.subject)
         def predicate = qName(st.predicate)
@@ -112,7 +118,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
         }
 
         countedStatements[qName(st.predicate)] += 1
-        if (++tripleCount%100000L == 0L) {
+        if (tripleCount%100000L == 0L) {
             println( (new Date()).toString() + \
             " Processed ${humanFormat(tripleCount)} triples")
         }
