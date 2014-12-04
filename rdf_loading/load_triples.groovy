@@ -64,7 +64,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
    
     void handleStatement(Statement st) {
         // Increment triple count and return early if this line should be skipped
-        if (++tripleCount < skipLines) {
+        if (++tripleCount <= skipLines) {
             if (tripleCount%100000L == 0L) {
                 println( (new Date()).toString() + \
                 " Skipped ${humanFormat(tripleCount)} triples")
@@ -289,6 +289,7 @@ def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0) {
     def sourceFilename = filepath.split('/')[-1][0..-5]
     def graphCommitter = new StatementsToGraphDB(graph, sourceFilename, skipLines)
     def rdfParser = new NTriplesParser()
+    rdfParser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE)
     rdfParser.setRDFHandler(graphCommitter)
     def startTime = System.currentTimeMillis()
     
