@@ -289,7 +289,9 @@ def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0) {
     def sourceFilename = filepath.split('/')[-1][0..-5]
     def graphCommitter = new StatementsToGraphDB(graph, sourceFilename, skipLines)
     def rdfParser = new NTriplesParser()
-    rdfParser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE)
+    def pConfig = rdfParser.getParserConfig()
+    pConfig.addNonFatalError(BasicParserSettings.VERIFY_DATATYPE_VALUES)
+    pConfig.addNonFatalError(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)
     rdfParser.setRDFHandler(graphCommitter)
     def startTime = System.currentTimeMillis()
     
