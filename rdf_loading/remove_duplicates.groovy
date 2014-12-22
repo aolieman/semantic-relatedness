@@ -7,6 +7,7 @@ def setup(args) {
     conf = new BaseConfiguration()
     conf.setProperty("storage.backend", "cassandra")
     conf.setProperty("storage.hostname", "127.0.0.1")
+    conf.setProperty("storage.cassandra.thrift.frame-size", 1000)
     conf.setProperty("schema.default", null)
     conf.setProperty("storage.index.search.backend", "elasticsearch")
     conf.setProperty("storage.index.search.client-only", false)
