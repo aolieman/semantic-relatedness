@@ -56,13 +56,12 @@ def map(u, args) {
         }
     }
     removeMsgs += findDuplicates(eSameLabel)
-    return removeMsgs ? removeMsgs.join("\n") : null
+    return removeMsgs ? g.commit(); removeMsgs.join("\n") : null
 }
 
 
 // close the Titan database connection
 def cleanup(args) {
-    g.commit()
     g.shutdown()
 }
 
