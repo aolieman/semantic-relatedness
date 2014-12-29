@@ -56,7 +56,13 @@ def map(u, args) {
         }
     }
     removeMsgs += findDuplicates(eSameLabel)
-    return removeMsgs ? g.commit(); removeMsgs.join("\n") : null
+    
+    if (removeMsgs) {
+        g.commit();
+        return removeMsgs.join("\n")
+    } else {
+        return null
+    }
 }
 
 
