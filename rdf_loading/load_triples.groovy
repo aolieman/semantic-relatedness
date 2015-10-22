@@ -282,8 +282,7 @@ def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0) {
     // Initialize a stream that feeds bz2-compressed triples
     def fin = new FileInputStream(filepath)
     def bis = new BufferedInputStream(fin)
-    def cisFactory = new CompressorStreamFactory()
-    cisFactory.setDecompressConcatenated(true)
+    def cisFactory = new CompressorStreamFactory(true)
     def cis = cisFactory.createCompressorInputStream(CompressorStreamFactory.BZIP2, bis)
 
     def sourceFilename = filepath.split('/')[-1][0..-5]
