@@ -32,10 +32,11 @@ class StatementsToGraphDB extends RDFHandlerBase {
     // Define known namespaces with their prefix
     def namespaces = [
         'http://www.w3.org/2001/XMLSchema#': 'xsd',
-        'http://dbpedia.org/resource/': 'dbp',
-        'http://dbpedia.org/ontology/': 'dbp-owl',
-        'http://dbpedia.org/property/': 'dbpprop',
-        'http://dbpedia.org/datatype/': 'dbp-dt',
+        'http://dbpedia.org/resource/': 'dbr-en',
+        'http://dbpedia.org/resource/Category:': 'dbc-en',
+        'http://dbpedia.org/ontology/': 'dbo',
+        'http://dbpedia.org/property/': 'dbp',
+        'http://dbpedia.org/datatype/': 'dbdt',
         'http://www.w3.org/1999/02/22-rdf-syntax-ns#': 'rdf',
         'http://www.w3.org/2000/01/rdf-schema#': 'rdfs',
         'http://www.w3.org/2002/07/owl#': 'owl',
@@ -44,7 +45,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
         'http://rdf.freebase.com/ns/': 'freebase',
         'http://www.wikidata.org/entity/': 'wikidata',
         'http://wikidata.org/entity/': 'wikidata',
-        'http://purl.org/dc/terms/': 'dcterms',
+        'http://wikidata.dbpedia.org/resource/': 'dbr-wikidata',
+        'http://purl.org/dc/terms/': 'dct',
         'http://purl.org/dc/elements/1.1/': 'dce',
         'http://www.w3.org/2004/02/skos/core#': 'skos',
         'http://purl.org/ontology/bibo/': 'bibo',
@@ -80,10 +82,15 @@ class StatementsToGraphDB extends RDFHandlerBase {
 
         if (st.object instanceof URI) {
             object = qName(st.object, false)
-            vObj = bg.getVertex(object) ?: bg.addVertex(object)
-            edge = bg.addEdge(null, vSubj, vObj, predicate)
-            edge.setProperty("created_at", System.currentTimeMillis())
-            edge.setProperty("provenance", sourceFilename)
+            
+            if (["rdf:type", "owl:sameAs"].contains(predicate)) {
+                vSubj.property(Cardinality.SET, predicate, object)
+            } else {            
+                vObj = bg.getVertex(object) ?: bg.addVertex(object)
+                edge = bg.addEdge(null, vSubj, vObj, predicate)
+                edge.property("created_at", System.currentTimeMillis())
+                edge.property("provenance", sourceFilename)
+            }
         } else {
             // TODO: handle additional literal datatypes
             // http://openrdf.callimachus.net/sesame/2.7/apidocs/org/openrdf/model/impl/LiteralImpl.html
@@ -112,9 +119,9 @@ class StatementsToGraphDB extends RDFHandlerBase {
                     propKey = predicate + '@' + langCode
                 }
             }
-            vSubj.setProperty(propKey, object)
-            vSubj.setProperty("created_at", System.currentTimeMillis())
-            vSubj.setProperty("provenance", sourceFilename)
+            vSubj.property(propKey, object)
+            vSubj.property("created_at", System.currentTimeMillis())
+            vSubj.property("provenance", sourceFilename)
         }
 
         countedStatements[qName(st.predicate)] += 1
@@ -129,6 +136,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
     }
 
     def qName(URI uri, Boolean validateNamespace=true) {
+        // TODO: deal with categories -> dbc:
         def nspc = uri.getNamespace()
         if (nspc.split("/resource/").size() > 1) {
             nspc = nspc[0..(-nspc.split("/resource/")[-1].size()-1)]
@@ -138,7 +146,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
             // resolve i18n DBpedia resources
             def matcher = nspc =~ /http:\/\/([a-z\-]+).dbpedia.org\/resource\//
             try {
-                prefix = 'dbp-' + matcher[0][1]
+                prefix = 'dbr-' + matcher[0][1]
             } catch (IndexOutOfBoundsException) {
                 // warn about unknown namespace when first encountered
                 if ( validateNamespace && !(nspc in unknownNamespaces) ) {
@@ -186,8 +194,8 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
         _partition = mgmt.makePropertyKey("_partition").dataType(String).make()
         // Define composite (key) indexes
         mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
-        mgmt.buildIndex('v_by_partition', Vertex).addKey(_partition).buildCompositeIndex()
-        mgmt.buildIndex('e_by_partition', Edge).addKey(_partition).buildCompositeIndex()
+        //mgmt.buildIndex('v_by_partition', Vertex).addKey(_partition).buildCompositeIndex()
+        //mgmt.buildIndex('e_by_partition', Edge).addKey(_partition).buildCompositeIndex()
         
         createdAt = mgmt.makePropertyKey("created_at").dataType(Long).make()
         provenance = mgmt.makePropertyKey("provenance").dataType(String).make()
@@ -212,15 +220,15 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
         
         // Make edge labels
         [
-            "rdf:type", "dcterms:subject", "dbp-owl:wikiPageWikiLink",
-            "dbp-owl:wikiPageDisambiguates", "skos:broader", "skos:related",
-            "owl:sameAs", "dbp-owl:wikiPageRedirects",
+            "dct:subject", "dbo:wikiPageWikiLink",
+            "dbo:wikiPageDisambiguates", "skos:broader", "skos:related",
+            "owl:sameAs", "dbo:wikiPageRedirects",
         ].each {
-            itLabel = mgmt.makeEdgeLabel(it).signature(createdAt,provenance).make()
-            mgmt.buildEdgeIndex(itLabel,"${it.replace(':', '_')}_by_created_at", Direction.BOTH,Order.DESC,createdAt)
+            itLabel = mgmt.makeEdgeLabel(it).signature(createdAt, provenance).make()
+            mgmt.buildEdgeIndex(itLabel, "${it.replace(':', '_')}_by_created_at", Direction.BOTH, Order.DESC, createdAt)
         }
-        categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow,createdAt,provenance).make()
-        mgmt.buildEdgeIndex(categoryFlow,'cat_flow_by_flow_and_created_at',Direction.BOTH,Order.DESC,flow,createdAt)
+        categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow, createdAt, provenance).make()
+        mgmt.buildEdgeIndex(categoryFlow, 'cat_flow_by_flow_and_created_at', Direction.BOTH, Order.DESC, flow, createdAt)
     }
     
     // Make keys and labels from an inferred datatype schema
