@@ -6,7 +6,7 @@
  * - Cassandra resource limits: http://www.datastax.com/documentation/cassandra/2.0/cassandra/troubleshooting/trblshootInsufficientResources_r.html
  */
 import org.openrdf.rio.*
-import org.openrdf.rio.ntriples.*
+import org.openrdf.rio.turtle.*
 import org.openrdf.rio.helpers.*
 import org.openrdf.model.*
 import org.apache.commons.compress.compressors.*
@@ -14,8 +14,8 @@ import javax.xml.bind.DatatypeConverter
 
 // Creates vertices and edges from RDF statements
 class StatementsToGraphDB extends RDFHandlerBase {
-    def bg, sourceFilename, skipLines
-    StatementsToGraphDB(g, sFn, skL) { bg = g; sourceFilename = sFn; skipLines = skL}
+    def graph, sourceFilename, skipLines
+    StatementsToGraphDB(g, sFn, skL) { graph = g; sourceFilename = sFn; skipLines = skL}
 
     def tripleCount = 0L
     // Human formatting for large numbers
@@ -78,7 +78,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
         def predicate = qName(st.predicate)
         def object, vObj, edge, langCode, propKey
 
-        def vSubj = bg.getVertex(subject) ?: bg.addVertex(subject)
+        def vSubj = graph.getVertex(subject) ?: graph.addVertex(subject)
 
         if (st.object instanceof URI) {
             object = qName(st.object, false)
@@ -86,8 +86,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
             if (["rdf:type", "owl:sameAs"].contains(predicate)) {
                 vSubj.property(Cardinality.SET, predicate, object)
             } else {            
-                vObj = bg.getVertex(object) ?: bg.addVertex(object)
-                edge = bg.addEdge(null, vSubj, vObj, predicate)
+                vObj = graph.getVertex(object) ?: graph.addVertex(object)
+                edge = graph.addEdge(null, vSubj, vObj, predicate)
                 edge.property("created_at", System.currentTimeMillis())
                 edge.property("provenance", sourceFilename)
             }
@@ -184,10 +184,10 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     conf.setProperty("storage.index.search.client-only", false)
     conf.setProperty("storage.index.search.local-mode", true)
       
-    def g = TitanFactory.open(conf)
+    def graph = TitanFactory.open(conf)
     // Types should only be defined once
     // Assumption: if "qname" exists, all keys and labels exist.
-    def mgmt = g.getManagementSystem()
+    def mgmt = graph.getManagementSystem()
     if (mgmt.containsPropertyKey("qname") == false) {
         // Make property keys
         qname = mgmt.makePropertyKey("qname").dataType(String).make()
@@ -281,15 +281,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     
     mgmt.commit()
     
-    bg = new BatchGraph(g, VertexIDType.STRING, 10000L)
-    bg.setVertexIdKey("qname")
-    // Assumption: if "qname" exists, we are not loading from scratch.
-    mgmt = g.getManagementSystem()
-    if (mgmt.containsPropertyKey("qname")) {
-        bg.setLoadingFromScratch(false)
-    }
-    pg = new PartitionGraph(bg, '_partition', 'dbp')
-    return pg
+    return graph
 }
 
 def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0) {
@@ -301,7 +293,7 @@ def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0) {
 
     def sourceFilename = filepath.split('/')[-1][0..-5]
     def graphCommitter = new StatementsToGraphDB(graph, sourceFilename, skipLines)
-    def rdfParser = new NTriplesParser()
+    def rdfParser = new TurtleParser()
     def pConfig = rdfParser.getParserConfig()
     pConfig.addNonFatalError(BasicParserSettings.VERIFY_DATATYPE_VALUES)
     pConfig.addNonFatalError(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)
@@ -325,7 +317,7 @@ def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0) {
         println(e)
     }
     
-    graph.baseGraph.commit()
+    graph.commit()
 
     def endTime = System.currentTimeMillis()
     def helpers = new Helpers()
