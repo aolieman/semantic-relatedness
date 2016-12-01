@@ -215,6 +215,12 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
         mgmt.makePropertyKey("georss:point").dataType(String).make()
         lat = mgmt.makePropertyKey("geo:lat").dataType(Double).make()
         lon = mgmt.makePropertyKey("geo:long").dataType(Double).make()
+        
+        rdfType = mgmt.makePropertyKey("rdf:type").dataType(String).cardinality(Cardinality.SET).make()
+        sameAs = mgmt.makePropertyKey("owl:sameAs").dataType(String).cardinality(Cardinality.SET).make()
+        mgmt.buildIndex('by_type', Vertex).addKey(rdfType).buildCompositeIndex()
+        mgmt.buildIndex('by_sameas', Vertex).addKey(sameAs).buildCompositeIndex()
+        
         // Define mixed indexes
         // mgmt.buildIndex('latlon',Vertex.class).addKey(lat).addKey(lon).buildMixedIndex("search")
         
@@ -224,10 +230,10 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
             "dbo:wikiPageDisambiguates", "skos:broader", "skos:related",
             "owl:sameAs", "dbo:wikiPageRedirects",
         ].each {
-            itLabel = mgmt.makeEdgeLabel(it).signature(createdAt, provenance).make()
-            mgmt.buildEdgeIndex(itLabel, "${it.replace(':', '_')}_by_created_at", Direction.BOTH, Order.DESC, createdAt)
+            itLabel = mgmt.makeEdgeLabel(it).multiplicity(SIMPLE).signature(createdAt, provenance).make()
+            //mgmt.buildEdgeIndex(itLabel, "${it.replace(':', '_')}_by_created_at", Direction.BOTH, Order.DESC, createdAt)
         }
-        categoryFlow = mgmt.makeEdgeLabel("category_flow").signature(flow, createdAt, provenance).make()
+        categoryFlow = mgmt.makeEdgeLabel("category_flow").multiplicity(SIMPLE).signature(flow, createdAt, provenance).make()
         mgmt.buildEdgeIndex(categoryFlow, 'cat_flow_by_flow_and_created_at', Direction.BOTH, Order.DESC, flow, createdAt)
     }
     
