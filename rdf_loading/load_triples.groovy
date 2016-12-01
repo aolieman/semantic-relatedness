@@ -187,7 +187,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     def graph = TitanFactory.open(conf)
     // Types should only be defined once
     // Assumption: if "qname" exists, all keys and labels exist.
-    def mgmt = graph.getManagementSystem()
+    def mgmt = graph.openManagement()
     if (mgmt.containsPropertyKey("qname") == false) {
         // Make property keys
         qname = mgmt.makePropertyKey("qname").dataType(String).make()
