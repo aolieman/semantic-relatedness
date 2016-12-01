@@ -238,7 +238,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     }
     
     // Make keys and labels from an inferred datatype schema
-    def namespaces = new StatementsToGraphDB(g, "schema", 0).namespaces
+    def namespaces = new StatementsToGraphDB(graph, "schema", 0).namespaces
     def createdAt = mgmt.getPropertyKey("created_at")
     def provenance = mgmt.getPropertyKey("provenance")
     new File(inferredSchema).eachLine { line ->
