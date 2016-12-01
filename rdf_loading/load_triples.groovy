@@ -199,7 +199,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
         
         createdAt = mgmt.makePropertyKey("created_at").dataType(Long).make()
         provenance = mgmt.makePropertyKey("provenance").dataType(String).make()
-        flow = mgmt.makePropertyKey("flow").dataType(Precision).make()
+        flow = mgmt.makePropertyKey("flow").dataType(Double).make()
         langCodes.each {
             mgmt.makePropertyKey("rdfs:label@" + it).dataType(String).make()
             mgmt.makePropertyKey("rdfs:comment@" + it).dataType(String).make()
@@ -230,10 +230,10 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
             "dbo:wikiPageDisambiguates", "skos:broader", "skos:related",
             "owl:sameAs", "dbo:wikiPageRedirects",
         ].each {
-            itLabel = mgmt.makeEdgeLabel(it).multiplicity(SIMPLE).signature(createdAt, provenance).make()
+            itLabel = mgmt.makeEdgeLabel(it).multiplicity(Multiplicity.SIMPLE).signature(createdAt, provenance).make()
             //mgmt.buildEdgeIndex(itLabel, "${it.replace(':', '_')}_by_created_at", Direction.BOTH, Order.DESC, createdAt)
         }
-        categoryFlow = mgmt.makeEdgeLabel("category_flow").multiplicity(SIMPLE).signature(flow, createdAt, provenance).make()
+        categoryFlow = mgmt.makeEdgeLabel("category_flow").multiplicity(Multiplicity.SIMPLE).signature(flow, createdAt, provenance).make()
         mgmt.buildEdgeIndex(categoryFlow, 'cat_flow_by_flow_and_created_at', Direction.BOTH, Order.DESC, flow, createdAt)
     }
     
