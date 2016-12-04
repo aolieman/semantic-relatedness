@@ -63,6 +63,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
     def countedStatements = [:].withDefault{0}
     
     def dtc = new DatatypeConverter()
+    
+    def g = graph.traversal()
    
     void handleStatement(Statement st) {
         // Increment triple count and return early if this line should be skipped
@@ -78,7 +80,7 @@ class StatementsToGraphDB extends RDFHandlerBase {
         def predicate = qName(st.predicate)
         def object, vObj, edge, langCode, propKey
 
-        def vSubj = graph.getVertex(subject) ?: graph.addVertex(subject)
+        def vSubj = g.V().has('qname', subject).next() ?: graph.addVertex('qname', subject)
 
         if (st.object instanceof URI) {
             object = qName(st.object, false)
@@ -86,10 +88,11 @@ class StatementsToGraphDB extends RDFHandlerBase {
             if (["rdf:type", "owl:sameAs"].contains(predicate)) {
                 vSubj.property(Cardinality.SET, predicate, object)
             } else {            
-                vObj = graph.getVertex(object) ?: graph.addVertex(object)
-                edge = graph.addEdge(null, vSubj, vObj, predicate)
-                edge.property("created_at", System.currentTimeMillis())
-                edge.property("provenance", sourceFilename)
+                vObj = g.V().has('qname', object).next() ?: graph.addVertex(['qname': object])
+                vSubj.addEdge(predicate, vObj)
+                     .property("created_at", System.currentTimeMillis())
+                     .property("provenance", sourceFilename)
+                     .next();
             }
         } else {
             // TODO: handle additional literal datatypes
