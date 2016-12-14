@@ -62,8 +62,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
     def countedStatements = [:].withDefault{0}
     
     def dtc = new DatatypeConverter()
-    
-    def g = graph.traversal()
+
+    def g = graph?.traversal()
    
     void handleStatement(Statement st) {
         // Increment triple count and return early if this line should be skipped
@@ -183,8 +183,8 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     conf.setProperty("storage.batch-loading", true)
     conf.setProperty("schema.default", null)
     conf.setProperty("storage.index.search.backend", "elasticsearch")
-    conf.setProperty("storage.index.search.client-only", false)
-    conf.setProperty("storage.index.search.local-mode", true)
+    conf.setProperty("storage.index.search.client-only", true)
+    //conf.setProperty("storage.index.search.local-mode", true)
       
     def graph = TitanFactory.open(conf)
     // Types should only be defined once
@@ -196,12 +196,12 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
         _partition = mgmt.makePropertyKey("_partition").dataType(String).make()
         // Define composite (key) indexes
         mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
-        //mgmt.buildIndex('v_by_partition', Vertex).addKey(_partition).buildCompositeIndex()
-        //mgmt.buildIndex('e_by_partition', Edge).addKey(_partition).buildCompositeIndex()
         
         createdAt = mgmt.makePropertyKey("created_at").dataType(Long).make()
         provenance = mgmt.makePropertyKey("provenance").dataType(String).make()
         flow = mgmt.makePropertyKey("flow").dataType(Double).make()
+        hops = mgmt.makePropertyKey("hops").dataType(Integer).make()
+
         langCodes.each {
             mgmt.makePropertyKey("rdfs:label@" + it).dataType(String).make()
             mgmt.makePropertyKey("rdfs:comment@" + it).dataType(String).make()
@@ -229,18 +229,21 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
         // Make edge labels
         [
             "dct:subject", "dbo:wikiPageWikiLink",
-            "dbo:wikiPageDisambiguates", "skos:broader", "skos:related",
-            "owl:sameAs", "dbo:wikiPageRedirects",
+            "dbo:wikiPageDisambiguates", "dbo:wikiPageRedirects",
+            "skos:broader", "skos:related",
         ].each {
             itLabel = mgmt.makeEdgeLabel(it).multiplicity(Multiplicity.SIMPLE).signature(createdAt, provenance).make()
-            //mgmt.buildEdgeIndex(itLabel, "${it.replace(':', '_')}_by_created_at", Direction.BOTH, Order.DESC, createdAt)
         }
-        categoryFlow = mgmt.makeEdgeLabel("category_flow").multiplicity(Multiplicity.SIMPLE).signature(flow, createdAt, provenance).make()
-        mgmt.buildEdgeIndex(categoryFlow, 'cat_flow_by_flow_and_created_at', Direction.BOTH, Order.DESC, flow, createdAt)
+        superordinateCategory = mgmt.makeEdgeLabel("superordinate_category")
+                                    .multiplicity(Multiplicity.SIMPLE)
+                                    .signature(hops, createdAt).make()
+
+        // FIXME: https://github.com/thinkaurelius/titan/issues/1275
+        //mgmt.buildEdgeIndex(superordinateCategory, 'superordinate_category_by_hops', Direction.BOTH, hops)
     }
     
     // Make keys and labels from an inferred datatype schema
-    def namespaces = new StatementsToGraphDB(graph, "schema", 0).namespaces
+    def namespaces = new StatementsToGraphDB(null, "schema", 0).namespaces
     def createdAt = mgmt.getPropertyKey("created_at")
     def provenance = mgmt.getPropertyKey("provenance")
     new File(inferredSchema).eachLine { line ->
