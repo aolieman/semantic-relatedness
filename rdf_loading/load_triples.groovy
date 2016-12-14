@@ -93,13 +93,12 @@ class StatementsToGraphDB extends RDFHandlerBase {
             object = qName(st.object, false)
             
             if (["rdf:type", "owl:sameAs"].contains(predicate)) {
-                vSubj.property(Cardinality.SET, predicate, object)
+                vSubj.property(VertexProperty$Cardinality.set, predicate, object)
             } else {            
                 vObj = getOrCreateVertex(object)
-                vSubj.addEdge(predicate, vObj)
-                     .property("created_at", System.currentTimeMillis())
-                     .property("provenance", sourceFilename)
-                     .next()
+                def e = vSubj.addEdge(predicate, vObj)
+                e.property("created_at", System.currentTimeMillis())
+                e.property("provenance", sourceFilename)
             }
         } else {
             // TODO: handle additional literal datatypes
