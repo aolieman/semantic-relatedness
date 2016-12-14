@@ -14,10 +14,24 @@ import javax.xml.bind.DatatypeConverter
 
 // Creates vertices and edges from RDF statements
 class StatementsToGraphDB extends RDFHandlerBase {
-    def graph, sourceFilename, skipLines
-    StatementsToGraphDB(g, sFn, skL) { graph = g; sourceFilename = sFn; skipLines = skL}
+    TitanGraph graph
+    String sourceFilename
+    Long skipLines
+    Long tripleCount
+    HashSet unknownNamespaces
+    Map countedStatements
+    GraphTraversalSource g
 
-    def tripleCount = 0L
+    StatementsToGraphDB(TitanGraph graph_, String sourceFilename_, Long skipLines_) {
+        graph = graph_
+        sourceFilename = sourceFilename_
+        skipLines = skipLines_
+        tripleCount = 0L
+        unknownNamespaces = new HashSet()
+        countedStatements = [:].withDefault{0}
+        g = graph.traversal()
+    }
+
     // Human formatting for large numbers
     def oom = ['k', 'M', 'G', 'T'] as char[]
     def humanFormat(double n, iteration=0) {
@@ -56,14 +70,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
         'http://www.ontologydesignpatterns.org/ont/d0.owl#': 'odp-d0',
         'http://www.ontologydesignpatterns.org/ont/dul/DUL.owl#': 'odp-dul'
     ]
-
-    def unknownNamespaces = new HashSet()
-   
-    def countedStatements = [:].withDefault{0}
     
     def dtc = new DatatypeConverter()
-
-    def g = graph?.traversal()
    
     void handleStatement(Statement st) {
         // Increment triple count and return early if this line should be skipped
@@ -77,9 +85,9 @@ class StatementsToGraphDB extends RDFHandlerBase {
     
         def subject = qName(st.subject)
         def predicate = qName(st.predicate)
-        def object, vObj, edge, langCode, propKey
+        def object, vObj, langCode, propKey
 
-        def vSubj = g.V().has('qname', subject).next() ?: graph.addVertex('qname', subject)
+        def vSubj = getOrCreateVertex(subject)
 
         if (st.object instanceof URI) {
             object = qName(st.object, false)
@@ -87,11 +95,11 @@ class StatementsToGraphDB extends RDFHandlerBase {
             if (["rdf:type", "owl:sameAs"].contains(predicate)) {
                 vSubj.property(Cardinality.SET, predicate, object)
             } else {            
-                vObj = g.V().has('qname', object).next() ?: graph.addVertex(['qname': object])
+                vObj = getOrCreateVertex(object)
                 vSubj.addEdge(predicate, vObj)
                      .property("created_at", System.currentTimeMillis())
                      .property("provenance", sourceFilename)
-                     .next();
+                     .next()
             }
         } else {
             // TODO: handle additional literal datatypes
@@ -126,6 +134,8 @@ class StatementsToGraphDB extends RDFHandlerBase {
             vSubj.property("provenance", sourceFilename)
         }
 
+        graph.tx().commit()
+
         countedStatements[qName(st.predicate)] += 1
         if (tripleCount%100000L == 0L) {
             println( (new Date()).toString() + \
@@ -159,6 +169,14 @@ class StatementsToGraphDB extends RDFHandlerBase {
             }
         }
         return prefix + ':' + uri.getLocalName()
+    }
+
+    def getOrCreateVertex(String qname) {
+        try {
+            return g.V().has('qname', qname).next()
+        } catch (FastNoSuchElementException) {
+            return graph.addVertex('qname', qname)
+        }
     }
 
 }
@@ -243,7 +261,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     }
     
     // Make keys and labels from an inferred datatype schema
-    def namespaces = new StatementsToGraphDB(null, "schema", 0).namespaces
+    def namespaces = new StatementsToGraphDB(graph, "schema", 0).namespaces
     def createdAt = mgmt.getPropertyKey("created_at")
     def provenance = mgmt.getPropertyKey("provenance")
     new File(inferredSchema).eachLine { line ->
@@ -289,7 +307,7 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     return graph
 }
 
-def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0) {
+def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0L) {
     // Initialize a stream that feeds bz2-compressed triples
     def fin = new FileInputStream(filepath)
     def bis = new BufferedInputStream(fin)
@@ -322,7 +340,7 @@ def loadRdfFromFile(Graph graph, String filepath, Long skipLines=0) {
         println(e)
     }
     
-    graph.commit()
+    graph.tx().commit()
 
     def endTime = System.currentTimeMillis()
     def helpers = new Helpers()
