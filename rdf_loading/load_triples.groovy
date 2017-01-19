@@ -204,60 +204,70 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     //conf.setProperty("storage.index.search.local-mode", true)
       
     def graph = TitanFactory.open(conf)
+
     // Types should only be defined once
-    // Assumption: if "qname" exists, all keys and labels exist.
     def mgmt = graph.openManagement()
-    if (mgmt.containsPropertyKey("qname") == false) {
-        // Make property keys
-        qname = mgmt.makePropertyKey("qname").dataType(String).make()
-        _partition = mgmt.makePropertyKey("_partition").dataType(String).make()
-        // Define composite (key) indexes
-        mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
-        
-        createdAt = mgmt.makePropertyKey("created_at").dataType(Long).make()
-        provenance = mgmt.makePropertyKey("provenance").dataType(String).make()
-        flow = mgmt.makePropertyKey("flow").dataType(Double).make()
-        hops = mgmt.makePropertyKey("hops").dataType(Integer).make()
 
-        langCodes.each {
-            mgmt.makePropertyKey("rdfs:label@" + it).dataType(String).make()
-            mgmt.makePropertyKey("rdfs:comment@" + it).dataType(String).make()
-            mgmt.makePropertyKey("skos:prefLabel@" + it).dataType(String).make()
-            mgmt.makePropertyKey("georss:point@" + it).dataType(String).make()
-            mgmt.makePropertyKey("foaf:nick@" + it).dataType(String).make()
-            mgmt.makePropertyKey("foaf:name@" + it).dataType(String).make()
-            mgmt.makePropertyKey("dce:language@" + it).dataType(String).make()
+    def getOrCreatePropertyKey(String keyName, dataType=String, cardinality=Cardinality.SINGLE) {
+        if (mgmt.containsPropertyKey(keyName)) {
+            return mgmt.getPropertyKey(keyName)
+        } else {
+            return mgmt.makePropertyKey(keyName).dataType(dataType).cardinality(cardinality).make()
         }
-        mgmt.makePropertyKey("rdfs:label").dataType(String).make()
-        mgmt.makePropertyKey("foaf:name").dataType(String).make()
-        mgmt.makePropertyKey("dce:description").dataType(String).make()
-        mgmt.makePropertyKey("georss:point").dataType(String).make()
-        lat = mgmt.makePropertyKey("geo:lat").dataType(Double).make()
-        lon = mgmt.makePropertyKey("geo:long").dataType(Double).make()
-        
-        rdfType = mgmt.makePropertyKey("rdf:type").dataType(String).cardinality(Cardinality.SET).make()
-        sameAs = mgmt.makePropertyKey("owl:sameAs").dataType(String).cardinality(Cardinality.SET).make()
-        mgmt.buildIndex('by_type', Vertex).addKey(rdfType).buildCompositeIndex()
-        mgmt.buildIndex('by_sameas', Vertex).addKey(sameAs).buildCompositeIndex()
-        
-        // Define mixed indexes
-        // mgmt.buildIndex('latlon',Vertex.class).addKey(lat).addKey(lon).buildMixedIndex("search")
-        
-        // Make edge labels
-        [
-            "dct:subject", "dbo:wikiPageWikiLink",
-            "dbo:wikiPageDisambiguates", "dbo:wikiPageRedirects",
-            "skos:broader", "skos:related",
-        ].each {
-            itLabel = mgmt.makeEdgeLabel(it).multiplicity(Multiplicity.SIMPLE).signature(createdAt, provenance).make()
-        }
-        superordinateCategory = mgmt.makeEdgeLabel("superordinate_category")
-                                    .multiplicity(Multiplicity.SIMPLE)
-                                    .signature(hops, createdAt).make()
-
-        // FIXME: https://github.com/thinkaurelius/titan/issues/1275
-        //mgmt.buildEdgeIndex(superordinateCategory, 'superordinate_category_by_hops', Direction.BOTH, hops)
     }
+
+    // Get or create property keys
+    qname = getOrCreatePropertyKey("qname")
+    _partition = getOrCreatePropertyKey("_partition")
+
+    createdAt = getOrCreatePropertyKey("created_at", Long)
+    provenance = getOrCreatePropertyKey("provenance")
+    flow = getOrCreatePropertyKey("flow", Double)
+    hops = getOrCreatePropertyKey("hops", Integer)
+
+    langCodes.each {
+        getOrCreatePropertyKey("rdfs:label@" + it)
+        getOrCreatePropertyKey("rdfs:comment@" + it)
+        getOrCreatePropertyKey("skos:prefLabel@" + it)
+        getOrCreatePropertyKey("georss:point@" + it)
+        getOrCreatePropertyKey("foaf:nick@" + it)
+        getOrCreatePropertyKey("foaf:name@" + it)
+        getOrCreatePropertyKey("dce:language@" + it)
+        getOrCreatePropertyKey("dbo:abstract@" + it)
+    }
+    getOrCreatePropertyKey("rdfs:label")
+    getOrCreatePropertyKey("foaf:name")
+    getOrCreatePropertyKey("dce:description")
+    getOrCreatePropertyKey("georss:point")
+
+    lat = getOrCreatePropertyKey("geo:lat", Double)
+    lon = getOrCreatePropertyKey("geo:long", Double)
+
+    rdfType = getOrCreatePropertyKey("rdf:type", cardinality=Cardinality.SET)
+    sameAs = getOrCreatePropertyKey("owl:sameAs", cardinality=Cardinality.SET)
+
+    // Define composite (key) indexes
+    mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
+    mgmt.buildIndex('by_type', Vertex).addKey(rdfType).buildCompositeIndex()
+    mgmt.buildIndex('by_sameas', Vertex).addKey(sameAs).buildCompositeIndex()
+
+    // Define mixed indexes
+    // mgmt.buildIndex('latlon',Vertex.class).addKey(lat).addKey(lon).buildMixedIndex("search")
+
+    // Make edge labels
+    [
+        "dct:subject", "dbo:wikiPageWikiLink",
+        "dbo:wikiPageDisambiguates", "dbo:wikiPageRedirects",
+        "skos:broader", "skos:related",
+    ].each {
+        itLabel = mgmt.makeEdgeLabel(it).multiplicity(Multiplicity.SIMPLE).signature(createdAt, provenance).make()
+    }
+    superordinateCategory = mgmt.makeEdgeLabel("superordinate_category")
+                                .multiplicity(Multiplicity.SIMPLE)
+                                .signature(hops, createdAt).make()
+
+    // FIXME: https://github.com/thinkaurelius/titan/issues/1275
+    //mgmt.buildEdgeIndex(superordinateCategory, 'superordinate_category_by_hops', Direction.BOTH, hops)
     
     // Make keys and labels from an inferred datatype schema
     def namespaces = new StatementsToGraphDB(graph, "schema", 0).namespaces
