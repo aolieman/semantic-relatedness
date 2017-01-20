@@ -208,16 +208,36 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     // Types should only be defined once
     def mgmt = graph.openManagement()
 
-    def getOrCreatePropertyKey(String keyName, dataType=String, cardinality=Cardinality.SINGLE) {
+    def getOrCreatePropertyKey = {String keyName, Class dataType=String, cardinality=Cardinality.SINGLE ->
         if (mgmt.containsPropertyKey(keyName)) {
             return mgmt.getPropertyKey(keyName)
         } else {
+            println "..making PropertyKey ${keyName} with ${dataType} and cardinality ${cardinality}"
             return mgmt.makePropertyKey(keyName).dataType(dataType).cardinality(cardinality).make()
         }
     }
 
-    // Get or create property keys
+    def getOrCreateCompositeIndex = {String indexName, Closure setters ->
+        if (mgmt.containsGraphIndex(indexName)) {
+            return mgmt.getGraphIndex(indexName)
+        } else {
+            println "..building CompositeIndex ${indexName}"
+            return setters(mgmt.buildIndex(indexName, Vertex)).buildCompositeIndex()
+        }
+    }
+
+    def getOrCreateEdgeLabel = {String labelName, Closure setters ->
+        if (mgmt.containsEdgeLabel(labelName)) {
+            return mgmt.getEdgeLabel(labelName)
+        } else {
+            println "..building EdgeLabel ${labelName}"
+            return setters(mgmt.makeEdgeLabel(labelName)).make()
+        }
+    }
+
+    // Define property keys
     qname = getOrCreatePropertyKey("qname")
+    testkey = getOrCreatePropertyKey("testkey")
     _partition = getOrCreatePropertyKey("_partition")
 
     createdAt = getOrCreatePropertyKey("created_at", Long)
@@ -243,13 +263,19 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
     lat = getOrCreatePropertyKey("geo:lat", Double)
     lon = getOrCreatePropertyKey("geo:long", Double)
 
-    rdfType = getOrCreatePropertyKey("rdf:type", cardinality=Cardinality.SET)
-    sameAs = getOrCreatePropertyKey("owl:sameAs", cardinality=Cardinality.SET)
+    rdfType = getOrCreatePropertyKey("rdf:type", String, Cardinality.SET)
+    sameAs = getOrCreatePropertyKey("owl:sameAs", String, Cardinality.SET)
 
     // Define composite (key) indexes
-    mgmt.buildIndex('by_qname', Vertex).addKey(qname).unique().buildCompositeIndex()
-    mgmt.buildIndex('by_type', Vertex).addKey(rdfType).buildCompositeIndex()
-    mgmt.buildIndex('by_sameas', Vertex).addKey(sameAs).buildCompositeIndex()
+    getOrCreateCompositeIndex('by_qname', {
+        it.addKey(qname).unique()
+    })
+    getOrCreateCompositeIndex('by_type', {
+        it.addKey(rdfType)
+    })
+    getOrCreateCompositeIndex('by_sameas', {
+        it.addKey(sameAs)
+    })
 
     // Define mixed indexes
     // mgmt.buildIndex('latlon',Vertex.class).addKey(lat).addKey(lon).buildMixedIndex("search")
@@ -260,11 +286,13 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
         "dbo:wikiPageDisambiguates", "dbo:wikiPageRedirects",
         "skos:broader", "skos:related",
     ].each {
-        itLabel = mgmt.makeEdgeLabel(it).multiplicity(Multiplicity.SIMPLE).signature(createdAt, provenance).make()
+        itLabel = getOrCreateEdgeLabel(it, {
+            it.multiplicity(Multiplicity.SIMPLE).signature(createdAt, provenance)
+        })
     }
-    superordinateCategory = mgmt.makeEdgeLabel("superordinate_category")
-                                .multiplicity(Multiplicity.SIMPLE)
-                                .signature(hops, createdAt).make()
+    superordinateCategory = getOrCreateEdgeLabel("superordinate_category", {
+        it.multiplicity(Multiplicity.SIMPLE).signature(hops, createdAt)
+    })
 
     // FIXME: https://github.com/thinkaurelius/titan/issues/1275
     //mgmt.buildEdgeIndex(superordinateCategory, 'superordinate_category_by_hops', Direction.BOTH, hops)
