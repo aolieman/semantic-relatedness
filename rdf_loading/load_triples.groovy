@@ -237,7 +237,6 @@ def prepareTitan(String inferredSchema, ArrayList langCodes) {
 
     // Define property keys
     qname = getOrCreatePropertyKey("qname")
-    testkey = getOrCreatePropertyKey("testkey")
     _partition = getOrCreatePropertyKey("_partition")
 
     createdAt = getOrCreatePropertyKey("created_at", Long)
